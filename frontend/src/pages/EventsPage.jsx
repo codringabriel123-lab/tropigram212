@@ -97,16 +97,13 @@ function CreateEventModal({ onClose, onCreated }) {
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>✕</button>
         </div>
 
-        {/* Titlu */}
         <label style={labelStyle}>Titlu eveniment *</label>
         <input value={form.title} onChange={e => set("title", e.target.value)} placeholder="ex: Drag Race Weekend" style={{ ...inputStyle, marginBottom: 14 }} />
 
-        {/* Descriere */}
         <label style={labelStyle}>Descriere</label>
         <textarea value={form.description} onChange={e => set("description", e.target.value)} placeholder="Detalii despre eveniment..." rows={3}
           style={{ ...inputStyle, resize: "vertical", marginBottom: 14 }} />
 
-        {/* Dată + Oră */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
           <div>
             <label style={labelStyle}>Dată *</label>
@@ -118,11 +115,9 @@ function CreateEventModal({ onClose, onCreated }) {
           </div>
         </div>
 
-        {/* Locație */}
         <label style={labelStyle}>Locație</label>
         <input value={form.location} onChange={e => set("location", e.target.value)} placeholder="ex: Industrial District, LS" style={{ ...inputStyle, marginBottom: 14 }} />
 
-        {/* Icon */}
         <label style={labelStyle}>Icon eveniment</label>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
           {ICONS.map(ic => (
@@ -133,7 +128,6 @@ function CreateEventModal({ onClose, onCreated }) {
           ))}
         </div>
 
-        {/* Culoare */}
         <label style={labelStyle}>Culoare</label>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
           {COLORS.map(c => (
@@ -143,7 +137,6 @@ function CreateEventModal({ onClose, onCreated }) {
           ))}
         </div>
 
-        {/* Intrare */}
         <label style={labelStyle}>Intrare</label>
         <div style={{ display: "flex", gap: 8, marginBottom: form.entryType === "platit" ? 10 : 14 }}>
           {["gratuit", "platit"].map(t => (
@@ -161,7 +154,6 @@ function CreateEventModal({ onClose, onCreated }) {
           </div>
         )}
 
-        {/* Premii */}
         <label style={labelStyle}>Premii</label>
         {form.prizes.map((p, i) => (
           <div key={i} style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center" }}>
@@ -197,6 +189,179 @@ function CreateEventModal({ onClose, onCreated }) {
   );
 }
 
+// Panel participanți
+function ParticipantsPanel({ event, user, onUpdate }) {
+  const [loading, setLoading] = useState(false);
+
+  const myEntry = event.participants?.find(p => p.user?._id === user?._id || p.user === user?._id);
+  const approvedList = event.participants?.filter(p => p.status === "approved") || [];
+  const pendingList = event.participants?.filter(p => p.status === "pending") || [];
+
+  const handleJoin = async () => {
+    setLoading(true);
+    try {
+      const r = await api.post(`/events/${event._id}/join`);
+      onUpdate(event._id, r.data.participants);
+    } catch (err) {
+      alert(err.response?.data?.message || "Eroare");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLeave = async () => {
+    setLoading(true);
+    try {
+      const r = await api.delete(`/events/${event._id}/join`);
+      onUpdate(event._id, r.data.participants);
+    } catch (err) {
+      alert(err.response?.data?.message || "Eroare");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApprove = async (userId) => {
+    try {
+      const r = await api.patch(`/events/${event._id}/participants/${userId}/approve`);
+      onUpdate(event._id, r.data.participants);
+    } catch (err) {
+      alert(err.response?.data?.message || "Eroare");
+    }
+  };
+
+  const handleReject = async (userId) => {
+    try {
+      const r = await api.patch(`/events/${event._id}/participants/${userId}/reject`);
+      onUpdate(event._id, r.data.participants);
+    } catch (err) {
+      alert(err.response?.data?.message || "Eroare");
+    }
+  };
+
+  const avatarStyle = (color) => ({
+    width: 30, height: 30, borderRadius: "50%", background: color || "#333",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: 13, fontWeight: 700, color: "#fff", flexShrink: 0,
+  });
+
+  return (
+    <div style={{ marginTop: 14, borderTop: `1px solid ${event.color}22`, paddingTop: 14 }}>
+
+      {/* Buton înscriere / retragere */}
+      {!myEntry && (
+        <button onClick={handleJoin} disabled={loading}
+          style={{
+            width: "100%", padding: "9px", borderRadius: 10, border: `1px solid ${event.color}`,
+            background: "transparent", color: event.color, fontWeight: 700, cursor: "pointer", fontSize: 13,
+            marginBottom: 14, opacity: loading ? 0.6 : 1,
+          }}>
+          {loading ? "..." : event.entry?.type === "gratuit" ? "✅ Înscrie-te (gratuit)" : "📨 Trimite cerere de înscriere"}
+        </button>
+      )}
+
+      {myEntry && myEntry.status === "pending" && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+          <div style={{ flex: 1, padding: "9px", borderRadius: 10, background: "#2a2000", border: "1px solid #f39c1233", color: "#f39c12", fontSize: 12, fontWeight: 600, textAlign: "center" }}>
+            ⏳ Cerere în așteptare (necesită aprobare admin)
+          </div>
+          <button onClick={handleLeave} disabled={loading}
+            style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid #e74c3c33", background: "transparent", color: "#e74c3c", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+            Anulează
+          </button>
+        </div>
+      )}
+
+      {myEntry && myEntry.status === "approved" && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+          <div style={{ flex: 1, padding: "9px", borderRadius: 10, background: "#1a2e1a", border: "1px solid #27ae6033", color: "#27ae60", fontSize: 12, fontWeight: 600, textAlign: "center" }}>
+            ✅ Ești înscris la acest eveniment
+          </div>
+          <button onClick={handleLeave} disabled={loading}
+            style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid #e74c3c33", background: "transparent", color: "#e74c3c", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+            Retrage-te
+          </button>
+        </div>
+      )}
+
+      {myEntry && myEntry.status === "rejected" && (
+        <div style={{ marginBottom: 14, padding: "9px", borderRadius: 10, background: "#2e1a1a", border: "1px solid #e74c3c33", color: "#e74c3c", fontSize: 12, fontWeight: 600, textAlign: "center" }}>
+          ❌ Cererea ta a fost respinsă
+        </div>
+      )}
+
+      {/* Lista participanți aprobați */}
+      {approvedList.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "#666", fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>
+            👥 Participanți ({approvedList.length})
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {approvedList.map((p, i) => {
+              const u = p.user;
+              const name = u?.displayName || u?.username || "?";
+              const initials = name.charAt(0).toUpperCase();
+              return (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {u?.avatar
+                    ? <img src={u.avatar} alt={name} style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover" }} />
+                    : <div style={avatarStyle(event.color)}>{initials}</div>
+                  }
+                  <span style={{ fontSize: 13, color: "#ccc" }}>{name}</span>
+                  <span style={{ fontSize: 11, color: "#555", marginLeft: "auto" }}>@{u?.username}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Admin: cereri în așteptare */}
+      {user?.isAdmin && pendingList.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, color: "#f39c12", fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>
+            ⏳ Cereri în așteptare ({pendingList.length})
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {pendingList.map((p, i) => {
+              const u = p.user;
+              const name = u?.displayName || u?.username || "?";
+              const initials = name.charAt(0).toUpperCase();
+              const userId = u?._id || u;
+              return (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, background: "#1a1a00", borderRadius: 8, padding: "8px 10px", border: "1px solid #f39c1222" }}>
+                  {u?.avatar
+                    ? <img src={u.avatar} alt={name} style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover" }} />
+                    : <div style={avatarStyle("#f39c12")}>{initials}</div>
+                  }
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, color: "#ccc" }}>{name}</div>
+                    <div style={{ fontSize: 11, color: "#555" }}>@{u?.username}</div>
+                  </div>
+                  <button onClick={() => handleApprove(userId)}
+                    style={{ padding: "5px 10px", borderRadius: 6, border: "none", background: "#27ae60", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 12 }}>
+                    ✓
+                  </button>
+                  <button onClick={() => handleReject(userId)}
+                    style={{ padding: "5px 10px", borderRadius: 6, border: "none", background: "#e74c3c", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 12 }}>
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {approvedList.length === 0 && (!user?.isAdmin || pendingList.length === 0) && !myEntry && (
+        <div style={{ fontSize: 12, color: "#444", textAlign: "center", padding: "4px 0" }}>
+          Niciun participant încă. Fii primul!
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EventsPage() {
   const { user } = useAuth();
   const [events, setEvents] = useState([]);
@@ -217,6 +382,12 @@ export default function EventsPage() {
     } catch (err) {
       alert(err.response?.data?.message || "Eroare");
     }
+  };
+
+  const handleParticipantsUpdate = (eventId, newParticipants) => {
+    setEvents(prev => prev.map(ev =>
+      ev._id === eventId ? { ...ev, participants: newParticipants } : ev
+    ));
   };
 
   if (loading) return <div style={{ textAlign: "center", padding: "4rem", color: "#555" }}>Se încarcă...</div>;
@@ -294,6 +465,13 @@ export default function EventsPage() {
                 )}
               </div>
             </div>
+
+            {/* Panel participanți */}
+            <ParticipantsPanel
+              event={ev}
+              user={user}
+              onUpdate={handleParticipantsUpdate}
+            />
 
             {/* Admin: buton ștergere */}
             {user?.isAdmin && (
