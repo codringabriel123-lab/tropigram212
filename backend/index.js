@@ -45,6 +45,10 @@ app.use("/api/admin", adminRoutes);
 
 app.get("/api/health", (req, res) => res.json({ status: "ok", time: new Date() }));
 
+app.get("/", (req, res) => {
+  res.json({ message: "🌴 Tropical RP API", status: "online", version: "1.0.0" });
+});
+
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: "Eroare server" });
