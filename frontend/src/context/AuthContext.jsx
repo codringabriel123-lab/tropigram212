@@ -13,8 +13,16 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem("trp_token");
     if (token) {
       api.get("/auth/me")
-        .then(res => { setUser(res.data); localStorage.setItem("trp_user", JSON.stringify(res.data)); })
-        .catch(() => { localStorage.removeItem("trp_token"); localStorage.removeItem("trp_user"); setUser(null); })
+        .then(res => {
+          setUser(res.data);
+          localStorage.setItem("trp_user", JSON.stringify(res.data));
+        })
+        .catch(() => {
+          // Token expirat sau invalid — curăță și rămâi pe pagina curentă
+          localStorage.removeItem("trp_token");
+          localStorage.removeItem("trp_user");
+          setUser(null);
+        })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
