@@ -3,13 +3,13 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
-const path = require("path");
 
 const authRoutes = require("./routes/auth");
 const postRoutes = require("./routes/posts");
 const userRoutes = require("./routes/users");
 const notifRoutes = require("./routes/notifications");
 const adminRoutes = require("./routes/admin");
+const uploadRoutes = require("./routes/upload");
 
 const app = express();
 
@@ -27,8 +27,8 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.json({ limit: "20mb" }));
+app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
 app.use(limiter);
@@ -42,6 +42,7 @@ app.use("/api/posts", postRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/notifications", notifRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/upload", uploadRoutes);
 
 app.get("/api/health", (req, res) => res.json({ status: "ok", time: new Date() }));
 
