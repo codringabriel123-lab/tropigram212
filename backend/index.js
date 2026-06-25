@@ -10,6 +10,7 @@ const userRoutes = require("./routes/users");
 const notifRoutes = require("./routes/notifications");
 const adminRoutes = require("./routes/admin");
 const uploadRoutes = require("./routes/upload");
+const eventRoutes = require("./routes/events");
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/notifications", notifRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/events", eventRoutes);
 
 app.get("/api/health", (req, res) => res.json({ status: "ok", time: new Date() }));
 
