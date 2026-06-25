@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../api";
 import Avatar from "../components/Avatar";
@@ -11,6 +11,7 @@ const ROLES = ["Civil", "Politie", "Mecanic", "Pompier", "Medic"];
 export default function ProfilePage() {
   const { id } = useParams();
   const { user: me, updateUser } = useAuth();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -172,12 +173,21 @@ export default function ProfilePage() {
             {editMode ? "Anulează" : "✏️ Editează profilul"}
           </button>
         ) : (
-          <button
-            onClick={handleFollow}
-            style={{ width: "100%", padding: "9px", borderRadius: 10, border: `1px solid ${following ? "#333" : "#e91e8c"}`, background: following ? "transparent" : "#e91e8c", color: following ? "#888" : "#fff", fontWeight: 600, cursor: "pointer", marginBottom: 16 }}
-          >
-            {following ? "Urmărești ✓" : "Urmărește"}
-          </button>
+          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            <button
+              onClick={handleFollow}
+              style={{ flex: 1, padding: "9px", borderRadius: 10, border: `1px solid ${following ? "#333" : "#e91e8c"}`, background: following ? "transparent" : "#e91e8c", color: following ? "#888" : "#fff", fontWeight: 600, cursor: "pointer" }}
+            >
+              {following ? "Urmărești ✓" : "Urmărește"}
+            </button>
+            <button
+              onClick={() => navigate(`/messages?with=${profile._id}`)}
+              style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid #333", background: "transparent", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 16 }}
+              title="Trimite mesaj"
+            >
+              💬
+            </button>
+          </div>
         )}
 
         {editMode && (

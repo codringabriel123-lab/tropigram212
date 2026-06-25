@@ -7,6 +7,7 @@ import MembersPage from "./pages/MembersPage";
 import EventsPage from "./pages/EventsPage";
 import ProfilePage from "./pages/ProfilePage";
 import AdminPage from "./pages/AdminPage";
+import MessagesPage from "./pages/MessagesPage";
 import Layout from "./components/Layout";
 
 function PrivateRoute({ children }) {
@@ -36,6 +37,7 @@ function AppRoutes() {
         <Route path="members" element={<MembersPage />} />
         <Route path="events" element={<EventsPage />} />
         <Route path="profile/:id" element={<ProfilePage />} />
+        <Route path="messages" element={<MessagesPage />} />
         <Route path="admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

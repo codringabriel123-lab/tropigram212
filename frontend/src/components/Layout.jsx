@@ -19,12 +19,21 @@ export default function Layout() {
   const [searchResults, setSearchResults] = useState([]);
   const [showSearch, setShowSearch] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [unreadDm, setUnreadDm] = useState(0);
 
   useEffect(() => {
     fetchUnread();
-    const interval = setInterval(fetchUnread, 30000);
+    fetchUnreadDm();
+    const interval = setInterval(() => { fetchUnread(); fetchUnreadDm(); }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const fetchUnreadDm = async () => {
+    try {
+      const res = await api.get("/messages/unread-count");
+      setUnreadDm(res.data.count);
+    } catch {}
+  };
 
   const fetchUnread = async () => {
     try {
@@ -59,7 +68,7 @@ export default function Layout() {
     { path: "/", icon: "🏠", label: "Acasă" },
     { path: "/explore", icon: "🔍", label: "Explorează" },
     { path: "/members", icon: "👥", label: "Membri" },
-    { path: "/events", icon: "📅", label: "Evenimente" },
+    { path: "/messages", icon: "💬", label: "Mesaje", badge: unreadDm },
     { path: `/profile/${user?._id}`, icon: "👤", label: "Profil" },
   ];
 
@@ -150,8 +159,13 @@ export default function Layout() {
           const active = isHome ? location.pathname === "/" : location.pathname.startsWith(tab.path.replace(`/profile/${user?._id}`, "/profile"));
           return (
             <button key={tab.path} onClick={() => navigate(tab.path)}
-              style={{ flex: 1, padding: "10px 0 14px", background: "transparent", border: "none", color: active ? "#e91e8c" : "#555", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+              style={{ flex: 1, padding: "10px 0 14px", background: "transparent", border: "none", color: active ? "#e91e8c" : "#555", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, position: "relative" }}>
               <span style={{ fontSize: 20 }}>{tab.icon}</span>
+              {tab.badge > 0 && (
+                <span style={{ position: "absolute", top: 6, left: "calc(50% + 6px)", background: "#e91e8c", borderRadius: "50%", width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "#fff" }}>
+                  {tab.badge > 9 ? "9+" : tab.badge}
+                </span>
+              )}
               <span style={{ fontSize: 9, fontWeight: active ? 700 : 400 }}>{tab.label}</span>
             </button>
           );
