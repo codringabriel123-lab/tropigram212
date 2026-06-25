@@ -17,12 +17,14 @@ export function AuthProvider({ children }) {
           setUser(res.data);
           localStorage.setItem("trp_user", JSON.stringify(res.data));
         })
-        .catch(() => {
-          // Token expirat sau invalid — curăță și rămâi pe pagina curentă
-          localStorage.removeItem("trp_token");
-          localStorage.removeItem("trp_user");
-          setUser(null);
-        })
+       // NOU
+.catch((err) => {
+  if (err.response?.status === 401) {
+    localStorage.removeItem("trp_token");
+    localStorage.removeItem("trp_user");
+    setUser(null);
+  }
+})
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
