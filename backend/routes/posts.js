@@ -50,7 +50,8 @@ router.get("/explore", auth, async (req, res) => {
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(Number(limit))
-      .populate("author", "username displayName avatar role location");
+      .populate("author", "username displayName avatar role location")
+      .populate("comments.author", "username displayName avatar");
     res.json(posts);
   } catch (err) {
     res.status(500).json({ message: "Eroare" });
