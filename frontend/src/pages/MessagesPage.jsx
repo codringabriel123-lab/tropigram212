@@ -17,7 +17,6 @@ export default function MessagesPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Tab: "dm" | "mafia"
   const [activeTab, setActiveTab] = useState("dm");
   const [hasMafiaAccess, setHasMafiaAccess] = useState(false);
 
@@ -30,6 +29,11 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
 
+  // ✏️ Typing indicator
+  const [isTyping, setIsTyping] = useState(false);
+  const typingPollRef = useRef();
+  const typingTimeoutRef = useRef();
+
   // Mafia chat state
   const [mafiaMessages, setMafiaMessages] = useState([]);
   const [mafiaText, setMafiaText] = useState("");
@@ -41,14 +45,12 @@ export default function MessagesPage() {
   const pollRef = useRef();
   const mafiaPollRef = useRef();
 
-  // Verifică accesul la mafia chat
   useEffect(() => {
     api.get("/mafia/check")
       .then(() => setHasMafiaAccess(true))
       .catch(() => setHasMafiaAccess(false));
   }, []);
 
-  // Încarcă conversațiile DM
   const fetchConversations = async () => {
     try {
       const res = await api.get("/messages/conversations");
@@ -61,7 +63,6 @@ export default function MessagesPage() {
     fetchConversations().finally(() => setLoading(false));
   }, []);
 
-  // Dacă vine cu ?with=userId
   useEffect(() => {
     const withUserId = searchParams.get("with");
     if (withUserId) {
@@ -74,7 +75,9 @@ export default function MessagesPage() {
   const openConversation = async (conv) => {
     setActiveConv(conv);
     setLoadingMsgs(true);
+    setIsTyping(false);
     clearInterval(pollRef.current);
+    clearInterval(typingPollRef.current);
     try {
       const res = await api.get(`/messages/conversations/${conv._id}/messages`);
       setMessages(res.data);
@@ -82,12 +85,39 @@ export default function MessagesPage() {
     } catch {}
     setLoadingMsgs(false);
 
+    // Poll mesaje
     pollRef.current = setInterval(async () => {
       try {
         const res = await api.get(`/messages/conversations/${conv._id}/messages`);
         setMessages(res.data);
       } catch {}
     }, 3000);
+
+    // ✏️ Poll typing indicator
+    typingPollRef.current = setInterval(async () => {
+      try {
+        const res = await api.get(`/messages/conversations/${conv._id}/typing`);
+        setIsTyping(res.data.typing);
+      } catch {}
+    }, 1500);
+  };
+
+  // ✏️ Trimite typing event când userul scrie
+  const handleTextChange = (e) => {
+    setText(e.target.value);
+    if (!activeConv) return;
+    api.post(`/messages/conversations/${activeConv._id}/typing`).catch(() => {});
+    clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {}, 3000);
+  };
+
+  // 🗑️ Șterge mesaj propriu
+  const handleDeleteMessage = async (msgId) => {
+    if (!window.confirm("Ștergi acest mesaj?")) return;
+    try {
+      await api.delete(`/messages/${msgId}`);
+      setMessages(prev => prev.map(m => m._id === msgId ? { ...m, isDeleted: true, text: "Mesaj șters" } : m));
+    } catch {}
   };
 
   // Mafia chat
@@ -122,14 +152,19 @@ export default function MessagesPage() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isTyping]);
 
   useEffect(() => {
     mafiaBottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [mafiaMessages]);
 
   useEffect(() => {
-    return () => { clearInterval(pollRef.current); clearInterval(mafiaPollRef.current); };
+    return () => {
+      clearInterval(pollRef.current);
+      clearInterval(mafiaPollRef.current);
+      clearInterval(typingPollRef.current);
+      clearTimeout(typingTimeoutRef.current);
+    };
   }, []);
 
   const sendMessage = async () => {
@@ -166,10 +201,12 @@ export default function MessagesPage() {
     chat: { flex: 1, display: "flex", flexDirection: "column" },
     chatHeader: { padding: "12px 16px", borderBottom: "1px solid #1f1f1f", display: "flex", alignItems: "center", gap: 10, fontWeight: 700, fontSize: 14 },
     messages: { flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: 8 },
-    bubble: (mine) => ({
+    bubble: (mine, deleted) => ({
       maxWidth: "70%", padding: "8px 12px", borderRadius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-      background: mine ? "#e91e8c" : "#1f1f1f", color: "#fff", fontSize: 13, lineHeight: 1.5,
+      background: deleted ? "#111" : mine ? "#e91e8c" : "#1f1f1f",
+      color: deleted ? "#555" : "#fff", fontSize: 13, lineHeight: 1.5,
       alignSelf: mine ? "flex-end" : "flex-start",
+      fontStyle: deleted ? "italic" : "normal",
     }),
     mafiaBubble: (mine) => ({
       maxWidth: "70%", padding: "8px 12px", borderRadius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
@@ -183,13 +220,12 @@ export default function MessagesPage() {
     sendBtn: (ok, mafia) => ({ background: ok ? (mafia ? "#8b0000" : "#e91e8c") : "#333", border: "none", borderRadius: "50%", width: 36, height: 36, color: "#fff", fontSize: 18, cursor: ok ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }),
     empty: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#444", gap: 8 },
     mafiaHeader: { padding: "12px 16px", borderBottom: "1px solid #330000", display: "flex", alignItems: "center", gap: 8, background: "#0d0000" },
-    senderName: { fontSize: 10, color: "#888", marginBottom: 2 },
     mafiaSenderName: { fontSize: 10, color: "#cc4444", marginBottom: 2 },
+    typingIndicator: { alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 6, color: "#888", fontSize: 12, padding: "4px 0" },
   };
 
   return (
     <div style={s.page}>
-      {/* Tab-uri */}
       <div style={s.tabs}>
         <button style={s.tab(activeTab === "dm", false)} onClick={() => setActiveTab("dm")}>
           💬 Mesaje Directe
@@ -202,7 +238,6 @@ export default function MessagesPage() {
       </div>
 
       <div style={s.body}>
-        {/* ─── DM TAB ─── */}
         {activeTab === "dm" && (
           <>
             <div style={s.sidebar}>
@@ -265,7 +300,17 @@ export default function MessagesPage() {
                       const showSeen = mine && isLast && msg.read && msg.seenAt;
                       return (
                         <div key={msg._id} style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start", gap: 2 }}>
-                          <div style={s.bubble(mine)}>{msg.text}</div>
+                          <div style={{ position: "relative", maxWidth: "70%", display: "flex", alignItems: "center", gap: 6, flexDirection: mine ? "row-reverse" : "row" }}>
+                            <div style={s.bubble(mine, msg.isDeleted)}>{msg.isDeleted ? "🗑️ Mesaj șters" : msg.text}</div>
+                            {/* 🗑️ Delete button — doar mesajele proprii, nedeletate */}
+                            {mine && !msg.isDeleted && (
+                              <button
+                                onClick={() => handleDeleteMessage(msg._id)}
+                                style={{ background: "none", border: "none", color: "#444", cursor: "pointer", fontSize: 13, padding: "2px", opacity: 0.6, flexShrink: 0 }}
+                                title="Șterge mesaj"
+                              >🗑️</button>
+                            )}
+                          </div>
                           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                             <span style={{ fontSize: 10, color: "#444" }}>{timeAgo(msg.createdAt)}</span>
                             {showSeen && <span style={{ fontSize: 10, color: "#e91e8c" }}>· Văzut</span>}
@@ -273,6 +318,20 @@ export default function MessagesPage() {
                         </div>
                       );
                     })}
+
+                    {/* ✏️ Typing indicator */}
+                    {isTyping && (
+                      <div style={s.typingIndicator}>
+                        <span style={{ fontSize: 16 }}>✏️</span>
+                        <span>{getOther(activeConv)?.displayName || getOther(activeConv)?.username} scrie...</span>
+                        <span style={{ letterSpacing: 2 }}>
+                          <span style={{ animation: "blink 1.4s infinite 0s" }}>●</span>
+                          <span style={{ animation: "blink 1.4s infinite 0.2s" }}>●</span>
+                          <span style={{ animation: "blink 1.4s infinite 0.4s" }}>●</span>
+                        </span>
+                      </div>
+                    )}
+
                     <div ref={bottomRef} />
                   </div>
 
@@ -281,7 +340,7 @@ export default function MessagesPage() {
                       style={s.input}
                       placeholder="Scrie un mesaj..."
                       value={text}
-                      onChange={e => setText(e.target.value)}
+                      onChange={handleTextChange}
                       onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage()}
                       maxLength={1000}
                     />
@@ -295,7 +354,6 @@ export default function MessagesPage() {
           </>
         )}
 
-        {/* ─── MAFIA CHAT TAB ─── */}
         {activeTab === "mafia" && hasMafiaAccess && (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "#0a0000" }}>
             <div style={s.mafiaHeader}>
@@ -337,6 +395,13 @@ export default function MessagesPage() {
           </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes blink {
+          0%, 80%, 100% { opacity: 0; }
+          40% { opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import api from "../api";
 import PostCard from "../components/PostCard";
 import PostModal from "../components/PostModal";
+import AnnouncementBanner from "../components/AnnouncementBanner";
 
 export default function FeedPage() {
   const [posts, setPosts] = useState([]);
@@ -25,6 +26,9 @@ export default function FeedPage() {
 
   return (
     <div>
+      {/* 📌 Anunțuri admin */}
+      <AnnouncementBanner />
+
       {posts.length === 0 && (
         <div style={{ textAlign: "center", padding: "5rem 2rem", color: "#555" }}>
           <div style={{ fontSize: 52, marginBottom: 16 }}>🌴</div>

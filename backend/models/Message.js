@@ -6,6 +6,7 @@ const messageSchema = new mongoose.Schema({
   text: { type: String, required: true, maxlength: 1000 },
   read: { type: Boolean, default: false },
   seenAt: { type: Date, default: null },
+  isDeleted: { type: Boolean, default: false }, // 🗑️ Ștergere mesaj
   createdAt: { type: Date, default: Date.now },
 });
 

@@ -29,6 +29,15 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // 🟢 Ping lastSeen la fiecare 2 minute cât timp userul e logat
+  useEffect(() => {
+    if (!user) return;
+    const ping = () => api.post("/users/me/ping").catch(() => {});
+    ping(); // immediate
+    const interval = setInterval(ping, 2 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user?._id]);
+
   const login = async (username, password) => {
     const res = await api.post("/auth/login", { username, password });
     localStorage.setItem("trp_token", res.data.token);

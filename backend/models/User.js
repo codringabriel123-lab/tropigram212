@@ -5,6 +5,7 @@ const userSchema = new mongoose.Schema({
   displayName: { type: String, required: true, trim: true, maxlength: 40 },
   password: { type: String, required: true, minlength: 6 },
   avatar: { type: String, default: "" },
+  banner: { type: String, default: "" }, // 🖼️ Banner profil
   bio: { type: String, default: "", maxlength: 200 },
   role: { type: String, default: "Civil", maxlength: 30 },
   customRole: { type: mongoose.Schema.Types.ObjectId, ref: "CustomRole", default: null },
@@ -17,12 +18,12 @@ const userSchema = new mongoose.Schema({
   banReason: { type: String, default: "" },
   bannedAt: { type: Date },
   bannedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  banExpiresAt: { type: Date, default: null }, // null = ban permanent
+  banExpiresAt: { type: Date, default: null },
   isMuted: { type: Boolean, default: false },
   muteReason: { type: String, default: "" },
   mutedAt: { type: Date },
   mutedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  muteExpiresAt: { type: Date, default: null }, // null = mute permanent
+  muteExpiresAt: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now },
   lastSeen: { type: Date, default: Date.now },
 });

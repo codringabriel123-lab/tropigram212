@@ -39,7 +39,9 @@ export default function MembersPage() {
         const isFollowing = myUser?.following?.map(id => id.toString()).includes(u._id.toString());
         return (
           <div key={u._id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #1f1f1f" }}>
-            <div onClick={() => navigate(`/profile/${u._id}`)} style={{ cursor: "pointer" }}><Avatar user={u} size={46} /></div>
+            <div onClick={() => navigate(`/profile/${u._id}`)} style={{ cursor: "pointer" }}>
+              <Avatar user={u} size={46} showOnline={true} friends={myUser?.following?.map(String) || []} />
+            </div>
             <div style={{ flex: 1, cursor: "pointer" }} onClick={() => navigate(`/profile/${u._id}`)}>
               <div style={{ fontWeight: 700, fontSize: 14 }}>{u.username}</div>
               <div style={{ fontSize: 12, color: "#666" }}>{u.bio?.slice(0, 45)}</div>

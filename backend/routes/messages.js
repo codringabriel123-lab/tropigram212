@@ -109,3 +109,41 @@ router.get("/unread-count", auth, async (req, res) => {
 });
 
 module.exports = router;
+
+// 🗑️ Șterge mesaj (doar al tău)
+router.delete("/:msgId", auth, async (req, res) => {
+  try {
+    const msg = await Message.findById(req.params.msgId);
+    if (!msg) return res.status(404).json({ message: "Mesaj negăsit" });
+    if (msg.sender.toString() !== req.user._id.toString())
+      return res.status(403).json({ message: "Poți șterge doar mesajele tale" });
+    msg.isDeleted = true;
+    await msg.save();
+    res.json({ message: "Mesaj șters" });
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
+// ✏️ Typing indicator — setează că tastează
+router.post("/conversations/:convId/typing", auth, async (req, res) => {
+  // Stored in-memory via a simple global map (suficient pentru polling)
+  if (!global.typingMap) global.typingMap = {};
+  global.typingMap[`${req.params.convId}:${req.user._id}`] = Date.now();
+  res.json({ ok: true });
+});
+
+// ✏️ Typing indicator — obține cine tastează în conversație
+router.get("/conversations/:convId/typing", auth, async (req, res) => {
+  if (!global.typingMap) global.typingMap = {};
+  const conv = await Conversation.findById(req.params.convId);
+  if (!conv) return res.status(404).json({ typing: false });
+
+  const otherParticipants = conv.participants.map(String).filter(id => id !== req.user._id.toString());
+  const now = Date.now();
+  const typing = otherParticipants.some(otherId => {
+    const ts = global.typingMap[`${req.params.convId}:${otherId}`];
+    return ts && (now - ts) < 3000; // activ în ultimele 3s
+  });
+  res.json({ typing });
+});

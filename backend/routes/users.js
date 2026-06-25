@@ -110,10 +110,10 @@ router.put("/:id/follow", auth, async (req, res) => {
   }
 });
 
-// Update profil (cu avatar opțional)
+// Update profil (cu avatar si banner optional)
 router.put("/me/update", auth, async (req, res) => {
   try {
-    const { displayName, bio, location, role, avatarBase64 } = req.body;
+    const { displayName, bio, location, role, avatarBase64, bannerBase64 } = req.body;
     const allowed = ["Civil", "Politie", "Mecanic", "Pompier", "Medic"];
     const update = {};
     if (displayName) update.displayName = displayName;
@@ -134,6 +134,19 @@ router.put("/me/update", auth, async (req, res) => {
       update.avatar = result.secure_url;
     }
 
+    // 🖼️ Upload banner pe Cloudinary dacă e trimis
+    if (bannerBase64) {
+      const bannerResult = await cloudinary.uploader.upload(bannerBase64, {
+        folder: "tropical-rp/banners",
+        transformation: [
+          { width: 1200, height: 400, crop: "fill" },
+          { quality: "auto" },
+          { fetch_format: "auto" },
+        ],
+      });
+      update.banner = bannerResult.secure_url;
+    }
+
     const user = await User.findByIdAndUpdate(req.user._id, update, { new: true }).select("-password");
     res.json(user);
   } catch (err) {
@@ -143,3 +156,13 @@ router.put("/me/update", auth, async (req, res) => {
 });
 
 module.exports = router;
+
+// 🟢 Update lastSeen (apelat periodic din frontend)
+router.post("/me/ping", auth, async (req, res) => {
+  try {
+    await User.findByIdAndUpdate(req.user._id, { lastSeen: new Date() });
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ message: "Eroare" });
+  }
+});

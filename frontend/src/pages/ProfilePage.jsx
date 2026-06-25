@@ -5,6 +5,7 @@ import api from "../api";
 import Avatar from "../components/Avatar";
 import PostCard from "../components/PostCard";
 import { getRoleColor, getRoleName } from "../utils/roleUtils";
+import { getRank } from "../utils/rankUtils";
 
 const ROLES = ["Civil", "Politie", "Mecanic", "Pompier", "Medic"];
 
@@ -24,6 +25,11 @@ export default function ProfilePage() {
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [avatarBase64, setAvatarBase64] = useState(null);
   const fileInputRef = useRef();
+  const bannerInputRef = useRef();
+  const [bannerPreview, setBannerPreview] = useState(null);
+  const [bannerBase64, setBannerBase64] = useState(null);
+  // 📊 Like count
+  const [totalLikes, setTotalLikes] = useState(0);
 
   const isMe = id === me?._id;
 
@@ -47,6 +53,22 @@ export default function ProfilePage() {
       })
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Calculate total likes from posts
+  useEffect(() => {
+    if (posts && posts.length > 0) {
+      setTotalLikes(posts.reduce((sum, p) => sum + (p.likes?.length || 0), 0));
+    }
+  }, [posts]);
+
+  const handleBannerChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) { alert("Imaginea e prea mare (max 8MB)"); return; }
+    const reader = new FileReader();
+    reader.onloadend = () => { setBannerPreview(reader.result); setBannerBase64(reader.result); };
+    reader.readAsDataURL(file);
+  };
 
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
@@ -153,7 +175,8 @@ export default function ProfilePage() {
           <div style={{ fontSize: 13, color: "#666", marginBottom: 12 }}>📍 {profile.location}</div>
         )}
 
-        <div style={{ display: "flex", gap: 24, marginBottom: 16 }}>
+        {/* 📊 Statistici */}
+        <div style={{ display: "flex", gap: 16, marginBottom: 14, flexWrap: "wrap" }}>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontWeight: 700, fontSize: 16 }}>{posts.length}</div>
             <div style={{ fontSize: 12, color: "#666" }}>postări</div>
@@ -166,7 +189,27 @@ export default function ProfilePage() {
             <div style={{ fontWeight: 700, fontSize: 16 }}>{profile.following?.length || 0}</div>
             <div style={{ fontSize: 12, color: "#e91e8c" }}>urmăriți</div>
           </div>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>{totalLikes}</div>
+            <div style={{ fontSize: 12, color: "#f59e0b" }}>❤️ like-uri</div>
+          </div>
         </div>
+
+        {/* 🎖️ Rang/Nivel */}
+        {(() => {
+          const rank = getRank(posts.length);
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, background: "#111", borderRadius: 8, padding: "8px 12px", border: `1px solid ${rank.color}33` }}>
+              <span style={{ fontSize: 18 }}>{rank.emoji}</span>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: rank.color }}>{rank.name}</div>
+                <div style={{ fontSize: 10, color: "#555" }}>
+                  pe server din {new Date(profile.createdAt).toLocaleDateString("ro-RO", { month: "long", year: "numeric" })}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {isMe ? (
           <button
