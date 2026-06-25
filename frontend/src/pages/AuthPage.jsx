@@ -3,7 +3,20 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 const ROLES = ["Civil", "Politie", "Mecanic", "Pompier", "Medic"];
-const inp = { width: "100%", display: "block", background: "#111", border: "1px solid #2a2a2a", borderRadius: 10, padding: "11px 14px", color: "#fff", fontSize: 14, marginBottom: 10, fontFamily: "inherit" };
+
+const inp = {
+  width: "100%",
+  display: "block",
+  background: "#111",
+  border: "1px solid #2a2a2a",
+  borderRadius: 10,
+  padding: "11px 14px",
+  color: "#fff",
+  fontSize: 14,
+  marginBottom: 10,
+  fontFamily: "inherit",
+  boxSizing: "border-box",
+};
 
 export default function AuthPage() {
   const { login, register } = useAuth();
@@ -12,18 +25,39 @@ export default function AuthPage() {
   const [form, setForm] = useState({ username: "", displayName: "", password: "", role: "Civil" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async () => {
-    setError(""); setLoading(true);
+    setError("");
+    if (!form.username.trim()) return setError("Completează username-ul");
+    if (!form.password.trim()) return setError("Completează parola");
+    if (mode === "register" && !form.displayName.trim()) return setError("Completează numele afișat");
+    if (mode === "register" && form.password.length < 6) return setError("Parola trebuie să aibă minim 6 caractere");
+
+    setLoading(true);
     try {
       if (mode === "login") {
         await login(form.username, form.password);
       } else {
-        await register({ username: form.username, displayName: form.displayName, password: form.password, role: form.role });
+        await register({
+          username: form.username,
+          displayName: form.displayName,
+          password: form.password,
+          role: form.role,
+        });
       }
       navigate("/");
     } catch (err) {
-      setError(err.response?.data?.message || "A apărut o eroare");
+      const msg = err.response?.data?.message;
+      if (msg === "Username sau parolă greșite") {
+        setError("Username sau parolă incorecte. Verifică și încearcă din nou.");
+      } else if (msg === "Username-ul este deja folosit") {
+        setError("Acest username este deja folosit. Alege altul.");
+      } else if (msg?.includes("banat")) {
+        setError(msg);
+      } else {
+        setError(msg || "A apărut o eroare. Încearcă din nou.");
+      }
     } finally {
       setLoading(false);
     }
@@ -49,13 +83,42 @@ export default function AuthPage() {
             ))}
           </div>
 
-          <input placeholder="Username" value={form.username} onChange={e => setForm(p => ({ ...p, username: e.target.value }))} style={inp} autoComplete="username" />
+          <input
+            placeholder="Username"
+            value={form.username}
+            onChange={e => setForm(p => ({ ...p, username: e.target.value }))}
+            style={inp}
+            autoComplete="username"
+          />
 
           {mode === "register" && (
-            <input placeholder="Nume afișat (ex: Andrei)" value={form.displayName} onChange={e => setForm(p => ({ ...p, displayName: e.target.value }))} style={inp} />
+            <input
+              placeholder="Nume afișat (ex: Andrei)"
+              value={form.displayName}
+              onChange={e => setForm(p => ({ ...p, displayName: e.target.value }))}
+              style={inp}
+            />
           )}
 
-          <input placeholder="Parolă" type="password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} onKeyDown={e => e.key === "Enter" && handleSubmit()} style={inp} autoComplete="current-password" />
+          {/* Parolă cu show/hide */}
+          <div style={{ position: "relative", marginBottom: 10 }}>
+            <input
+              placeholder="Parolă"
+              type={showPassword ? "text" : "password"}
+              value={form.password}
+              onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+              onKeyDown={e => e.key === "Enter" && handleSubmit()}
+              style={{ ...inp, marginBottom: 0, paddingRight: 44 }}
+              autoComplete="current-password"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(v => !v)}
+              style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", color: "#666", cursor: "pointer", fontSize: 16, padding: 0 }}
+            >
+              {showPassword ? "🙈" : "👁️"}
+            </button>
+          </div>
 
           {mode === "register" && (
             <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))} style={{ ...inp, color: "#fff" }}>
@@ -63,10 +126,17 @@ export default function AuthPage() {
             </select>
           )}
 
-          {error && <p style={{ color: "#e91e8c", fontSize: 13, marginBottom: 10, textAlign: "center" }}>{error}</p>}
+          {error && (
+            <div style={{ background: "#2a1a1a", border: "1px solid #e91e8c44", borderRadius: 8, padding: "10px 12px", marginBottom: 12 }}>
+              <p style={{ color: "#e91e8c", fontSize: 13, margin: 0, textAlign: "center" }}>⚠️ {error}</p>
+            </div>
+          )}
 
-          <button onClick={handleSubmit} disabled={loading}
-            style={{ width: "100%", padding: "13px", borderRadius: 10, border: "none", background: "#e91e8c", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", opacity: loading ? 0.7 : 1 }}>
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            style={{ width: "100%", padding: "13px", borderRadius: 10, border: "none", background: "#e91e8c", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", opacity: loading ? 0.7 : 1 }}
+          >
             {loading ? "Se încarcă..." : mode === "login" ? "Conectează-te" : "Creează cont"}
           </button>
 
