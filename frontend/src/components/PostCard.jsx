@@ -63,15 +63,19 @@ export default function PostCard({ post: initialPost, onDelete }) {
 
   return (
     <div style={{ borderBottom: "1px solid #1a1a1a" }}>
+      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px 8px" }}>
         <div onClick={() => navigate(`/profile/${post.author?._id}`)} style={{ cursor: "pointer" }}>
           <Avatar user={post.author} size={40} />
         </div>
         <div style={{ flex: 1 }}>
           <div onClick={() => navigate(`/profile/${post.author?._id}`)} style={{ fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-            {post.author?.username}
+            {post.author?.displayName || post.author?.username}
           </div>
-          {post.location && <div style={{ fontSize: 12, color: "#666" }}>📍 {post.location}</div>}
+          <div style={{ fontSize: 12, color: "#555" }}>
+            @{post.author?.username}
+            {post.location && <span> · 📍 {post.location}</span>}
+          </div>
         </div>
         <div style={{ fontSize: 12, color: "#555" }}>{timeAgo(post.createdAt)}</div>
         {(isOwner || isAdmin) && (
@@ -79,15 +83,31 @@ export default function PostCard({ post: initialPost, onDelete }) {
         )}
       </div>
 
-      <div style={{ padding: "2px 16px 10px" }}>
-        <p style={{ fontSize: 14, lineHeight: 1.6, color: "#ddd", marginBottom: hashtags.length ? 4 : 0 }}>{cleanContent}</p>
-        {hashtags.length > 0 && (
-          <p style={{ fontSize: 13 }}>
-            {hashtags.map((t, i) => <span key={i} style={{ color: "#e91e8c", marginRight: 6 }}>{t}</span>)}
-          </p>
-        )}
-      </div>
+      {/* Conținut text */}
+      {(cleanContent || hashtags.length > 0) && (
+        <div style={{ padding: "2px 16px 10px" }}>
+          {cleanContent && <p style={{ fontSize: 14, lineHeight: 1.6, color: "#ddd", marginBottom: hashtags.length ? 4 : 0 }}>{cleanContent}</p>}
+          {hashtags.length > 0 && (
+            <p style={{ fontSize: 13 }}>
+              {hashtags.map((t, i) => <span key={i} style={{ color: "#e91e8c", marginRight: 6 }}>{t}</span>)}
+            </p>
+          )}
+        </div>
+      )}
 
+      {/* Imagine postare */}
+      {post.image && (
+        <div style={{ marginBottom: 4 }}>
+          <img
+            src={post.image}
+            alt="postare"
+            style={{ width: "100%", maxHeight: 500, objectFit: "cover", display: "block" }}
+            loading="lazy"
+          />
+        </div>
+      )}
+
+      {/* Like & Comentarii */}
       <div style={{ display: "flex", gap: 20, padding: "6px 16px 10px", alignItems: "center" }}>
         <button onClick={handleLike} style={{ background: "transparent", border: "none", color: isLiked ? "#e91e8c" : "#666", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 22, padding: 0 }}>
           {isLiked ? "❤️" : "🤍"} <span style={{ fontSize: 14, color: isLiked ? "#e91e8c" : "#666" }}>{post.likes?.length || 0}</span>
@@ -97,6 +117,7 @@ export default function PostCard({ post: initialPost, onDelete }) {
         </button>
       </div>
 
+      {/* Secțiunea comentarii */}
       {showComments && (
         <div style={{ padding: "0 16px 16px" }}>
           {post.comments?.map(c => (
