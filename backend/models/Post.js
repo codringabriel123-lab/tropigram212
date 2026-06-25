@@ -11,6 +11,12 @@ const postSchema = new mongoose.Schema({
   content: { type: String, required: true, maxlength: 2000 },
   image: { type: String, default: "" },
   location: { type: String, default: "", maxlength: 60 },
+  song: {
+    url: { type: String, default: "" },
+    type: { type: String, enum: ["youtube", "spotify", ""], default: "" },
+    embedId: { type: String, default: "" },
+    title: { type: String, default: "", maxlength: 150 },
+  },
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   comments: [commentSchema],
   isDeleted: { type: Boolean, default: false },

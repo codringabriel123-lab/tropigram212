@@ -3,6 +3,28 @@ const Post = require("../models/Post");
 const Notification = require("../models/Notification");
 const { auth, muteCheck } = require("../middleware/auth");
 
+// Extrage tip + id embed dintr-un link YouTube sau Spotify
+function parseSongUrl(url) {
+  if (!url || typeof url !== "string") return null;
+  const trimmed = url.trim();
+
+  // YouTube: youtu.be/ID, youtube.com/watch?v=ID, youtube.com/shorts/ID, music.youtube.com
+  const ytMatch = trimmed.match(
+    /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/|music\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/
+  );
+  if (ytMatch) {
+    return { type: "youtube", embedId: ytMatch[1], url: trimmed };
+  }
+
+  // Spotify: open.spotify.com/track/ID sau /intl-xx/track/ID
+  const spMatch = trimmed.match(/open\.spotify\.com\/(?:intl-[a-z]{2}\/)?track\/([a-zA-Z0-9]+)/);
+  if (spMatch) {
+    return { type: "spotify", embedId: spMatch[1], url: trimmed };
+  }
+
+  return null;
+}
+
 // Feed - postări de la userii urmăriți + proprii
 router.get("/feed", auth, async (req, res) => {
   try {
@@ -51,9 +73,25 @@ router.get("/user/:userId", auth, async (req, res) => {
 // Creare postare
 router.post("/", auth, muteCheck, async (req, res) => {
   try {
-    const { content, image, location } = req.body;
+    const { content, image, location, songUrl, songTitle } = req.body;
     if (!content?.trim()) return res.status(400).json({ message: "Conținutul este obligatoriu" });
-    const post = new Post({ author: req.user._id, content: content.trim(), image: image || "", location: location || "" });
+
+    let song = undefined;
+    if (songUrl?.trim()) {
+      const parsed = parseSongUrl(songUrl);
+      if (!parsed) {
+        return res.status(400).json({ message: "Link de melodie invalid. Folosește un link YouTube sau Spotify." });
+      }
+      song = { ...parsed, title: songTitle?.trim().slice(0, 150) || "" };
+    }
+
+    const post = new Post({
+      author: req.user._id,
+      content: content.trim(),
+      image: image || "",
+      location: location || "",
+      ...(song ? { song } : {}),
+    });
     await post.save();
     await post.populate("author", "username displayName avatar role location");
     res.status(201).json(post);

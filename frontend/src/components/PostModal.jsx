@@ -11,7 +11,28 @@ export default function PostModal({ onClose, onPost }) {
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showSongInput, setShowSongInput] = useState(false);
+  const [songUrl, setSongUrl] = useState("");
   const fileInputRef = useRef();
+
+  function detectSong(url) {
+    if (!url) return null;
+    const yt = url.match(
+      /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/|music\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/
+    );
+    if (yt) return { type: "youtube", embedId: yt[1] };
+    const sp = url.match(/open\.spotify\.com\/(?:intl-[a-z]{2}\/)?track\/([a-zA-Z0-9]+)/);
+    if (sp) return { type: "spotify", embedId: sp[1] };
+    return null;
+  }
+
+  const songPreview = detectSong(songUrl.trim());
+  const songUrlInvalid = songUrl.trim().length > 0 && !songPreview;
+
+  const removeSong = () => {
+    setSongUrl("");
+    setShowSongInput(false);
+  };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -39,6 +60,10 @@ export default function PostModal({ onClose, onPost }) {
       setError("Adaugă text sau o imagine");
       return;
     }
+    if (songUrlInvalid) {
+      setError("Link de melodie invalid. Folosește un link YouTube sau Spotify.");
+      return;
+    }
     setLoading(true);
     setError("");
 
@@ -56,6 +81,7 @@ export default function PostModal({ onClose, onPost }) {
       const res = await api.post("/posts", {
         content: content.trim(),
         image: imageUrl,
+        songUrl: songPreview ? songUrl.trim() : "",
       });
 
       onPost?.(res.data);
@@ -102,6 +128,47 @@ export default function PostModal({ onClose, onPost }) {
           </div>
         )}
 
+        {showSongInput && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="text"
+                placeholder="Lipește un link YouTube sau Spotify..."
+                value={songUrl}
+                onChange={e => setSongUrl(e.target.value)}
+                style={{
+                  flex: 1,
+                  background: "#111",
+                  border: `1px solid ${songUrlInvalid ? "#e91e8c" : "#2a2a2a"}`,
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  color: "#fff",
+                  fontSize: 13,
+                }}
+                autoFocus
+              />
+              <button
+                onClick={removeSong}
+                style={{ background: "transparent", border: "none", color: "#555", fontSize: 16, cursor: "pointer", padding: 4 }}
+                title="Elimină melodia"
+              >✕</button>
+            </div>
+            {songPreview && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, padding: "8px 10px", background: "#111", borderRadius: 10, border: "1px solid #2a2a2a" }}>
+                <span style={{ fontSize: 16 }}>{songPreview.type === "youtube" ? "▶️" : "🎵"}</span>
+                <span style={{ fontSize: 12, color: "#aaa" }}>
+                  Melodie {songPreview.type === "youtube" ? "YouTube" : "Spotify"} detectată
+                </span>
+              </div>
+            )}
+            {songUrlInvalid && (
+              <p style={{ fontSize: 12, color: "#e91e8c", marginTop: 6 }}>
+                Link nerecunoscut. Folosește un link YouTube sau Spotify valid.
+              </p>
+            )}
+          </div>
+        )}
+
         {error && <p style={{ color: "#e91e8c", fontSize: 13, marginBottom: 10 }}>⚠️ {error}</p>}
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -112,13 +179,27 @@ export default function PostModal({ onClose, onPost }) {
               title="Adaugă imagine"
             >🖼️</button>
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} style={{ display: "none" }} />
+
+            <button
+              onClick={() => setShowSongInput(s => !s)}
+              style={{
+                background: showSongInput ? "#e91e8c22" : "#111",
+                border: `1px solid ${showSongInput ? "#e91e8c" : "#333"}`,
+                borderRadius: 8,
+                color: showSongInput ? "#e91e8c" : "#aaa",
+                cursor: "pointer",
+                padding: "8px 12px",
+                fontSize: 18,
+              }}
+              title="Adaugă melodie"
+            >🎵</button>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span style={{ fontSize: 12, color: content.length > 1800 ? "#e91e8c" : "#555" }}>{content.length}/2000</span>
             <button
               onClick={handleSubmit}
-              disabled={loading || (!content.trim() && !imageBase64)}
+              disabled={loading || (!content.trim() && !imageBase64) || songUrlInvalid}
               style={{ padding: "9px 20px", borderRadius: 10, border: "none", background: "#e91e8c", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: loading ? 0.7 : 1, fontSize: 14 }}
             >
               {uploading ? "Se urcă..." : loading ? "Se postează..." : "Postează"}

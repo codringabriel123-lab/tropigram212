@@ -96,6 +96,32 @@ export default function PostCard({ post: initialPost, onDelete }) {
         </div>
       )}
 
+      {/* Melodie */}
+      {post.song?.embedId && (
+        <div style={{ padding: "0 16px 10px" }}>
+          {post.song.type === "youtube" ? (
+            <div style={{ position: "relative", paddingTop: "56.25%", borderRadius: 10, overflow: "hidden", border: "1px solid #2a2a2a" }}>
+              <iframe
+                src={`https://www.youtube.com/embed/${post.song.embedId}`}
+                title={post.song.title || "Melodie"}
+                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                loading="lazy"
+              />
+            </div>
+          ) : post.song.type === "spotify" ? (
+            <iframe
+              src={`https://open.spotify.com/embed/track/${post.song.embedId}`}
+              title={post.song.title || "Melodie"}
+              style={{ width: "100%", height: 152, border: "none", borderRadius: 10 }}
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              loading="lazy"
+            />
+          ) : null}
+        </div>
+      )}
+
       {/* Imagine postare */}
       {post.image && (
         <div style={{ marginBottom: 4 }}>
