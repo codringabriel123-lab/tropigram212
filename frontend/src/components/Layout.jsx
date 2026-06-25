@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import api from "../api";
 import Avatar from "./Avatar";
@@ -86,7 +86,7 @@ export default function Layout() {
                   style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid #222" }}>
                   <Avatar user={u} size={32} />
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{u.username}</div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{u.displayName || u.username}</div>
                     <div style={{ fontSize: 11, color: ROLE_COLORS[u.role] || "#888" }}>{u.role}</div>
                   </div>
                 </div>
@@ -96,10 +96,10 @@ export default function Layout() {
         </div>
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button onClick={() => setShowPostModal(true)} style={{ width: 34, height: 34, borderRadius: "50%", background: "#e91e8c", border: "none", color: "#fff", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+          <button onClick={() => setShowPostModal(true)} style={{ width: 34, height: 34, borderRadius: "50%", background: "#e91e8c", border: "none", color: "#fff", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>+</button>
 
           <div style={{ position: "relative" }}>
-            <button onClick={openNotifs} style={{ width: 34, height: 34, borderRadius: "50%", background: "#1a1a1a", border: "1px solid #333", color: "#fff", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>🔔</button>
+            <button onClick={openNotifs} style={{ width: 34, height: 34, borderRadius: "50%", background: "#1a1a1a", border: "1px solid #333", color: "#fff", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>🔔</button>
             {unread > 0 && <span style={{ position: "absolute", top: -4, right: -4, background: "#e91e8c", borderRadius: "50%", width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700 }}>{unread > 9 ? "9+" : unread}</span>}
 
             {showNotif && (
@@ -124,8 +124,8 @@ export default function Layout() {
           </div>
 
           <div style={{ position: "relative" }}>
-            <div onClick={() => setShowMenu(!showMenu)} style={{ width: 34, height: 34, borderRadius: "50%", background: "#e91e8c", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12, cursor: "pointer", border: "2px solid #333" }}>
-              {user?.avatar}
+            <div onClick={() => setShowMenu(!showMenu)} style={{ width: 34, height: 34, borderRadius: "50%", overflow: "hidden", cursor: "pointer", border: "2px solid #333" }}>
+              <Avatar user={user} size={30} />
             </div>
             {showMenu && (
               <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "#1a1a1a", border: "1px solid #333", borderRadius: 10, zIndex: 300, overflow: "hidden", minWidth: 160 }}>
