@@ -140,6 +140,14 @@ export default function AuthPage() {
             {loading ? "Se încarcă..." : mode === "login" ? "Conectează-te" : "Creează cont"}
           </button>
 
+          {mode === "login" && (
+            <div style={{ marginTop: 14, textAlign: "center", background: "#111", borderRadius: 8, padding: "10px 14px", border: "1px solid #2a2a2a" }}>
+              <p style={{ fontSize: 12, color: "#555", margin: 0 }}>
+                🔑 Ai uitat parola? Contactează un <span style={{ color: "#e91e8c" }}>admin</span> pe Discord sau în joc — el îți poate reseta parola din panelul de administrare.
+              </p>
+            </div>
+          )}
+
           {mode === "register" && (
             <p style={{ fontSize: 11, color: "#444", textAlign: "center", marginTop: 12 }}>
               Primul cont creat primește automat drepturi de admin 👑

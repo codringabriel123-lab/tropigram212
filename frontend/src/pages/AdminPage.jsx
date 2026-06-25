@@ -86,6 +86,7 @@ export default function AdminPage() {
   const [newRoleIsMafia, setNewRoleIsMafia] = useState(false);
   const [editingRole, setEditingRole] = useState(null); // { _id, name, color }
   const [roleModal, setRoleModal] = useState(null); // { userId, username } pentru atribuire rol
+  const [resetResult, setResetResult] = useState(null); // { username, tempPassword }
 
   useEffect(() => {
     api.get("/admin/stats").then(r => setStats(r.data)).finally(() => setLoading(false));
@@ -283,6 +284,17 @@ export default function AdminPage() {
                   🎭 Schimbă rol
                 </button>
 
+                <button onClick={async () => {
+                  if (!window.confirm(`Resetezi parola lui @${u.username}? Va primi o parolă temporară.`)) return;
+                  try {
+                    const r = await api.post(`/admin/users/${u._id}/reset-password`);
+                    setResetResult({ username: r.data.username, tempPassword: r.data.tempPassword });
+                  } catch (err) { alert(err.response?.data?.message || "Eroare"); }
+                }}
+                  style={{ flex: "1 1 100%", padding: "7px", borderRadius: 8, border: "1px solid #ff9800", background: "transparent", color: "#ff9800", fontWeight: 600, cursor: "pointer", fontSize: 12 }}>
+                  🔑 Reset Parolă
+                </button>
+
                 <button onClick={() => handleToggleVerify(u._id, u.username, u.isVerified)}
                   style={{ flex: "1 1 100%", padding: "7px", borderRadius: 8, border: `1px solid ${u.isVerified ? "#888" : "#1da1f2"}`, background: "transparent", color: u.isVerified ? "#888" : "#1da1f2", fontWeight: 600, cursor: "pointer", fontSize: 12 }}>
                   {u.isVerified ? "❌ Elimină verificarea" : "✓ Verifică contul"}
@@ -464,6 +476,29 @@ export default function AdminPage() {
           onConfirm={handleMuteConfirm}
           onCancel={() => setModal(null)}
         />
+      )}
+
+      {/* Modal parolă temporară */}
+      {resetResult && (
+        <div onClick={() => setResetResult(null)} style={{ position: "fixed", inset: 0, background: "#000000cc", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#1a1a1a", border: "1px solid #ff9800", borderRadius: 14, padding: "2rem", maxWidth: 380, width: "100%" }}>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8, color: "#ff9800" }}>🔑 Parolă resetată</div>
+            <p style={{ fontSize: 13, color: "#aaa", marginBottom: 16 }}>
+              Trimite această parolă temporară lui <b style={{ color: "#fff" }}>@{resetResult.username}</b>. După ce se loghează, poate să și-o schimbe din profil.
+            </p>
+            <div style={{ background: "#111", border: "1px solid #ff9800", borderRadius: 8, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 16 }}>
+              <span style={{ fontFamily: "monospace", fontSize: 18, fontWeight: 700, color: "#ff9800", letterSpacing: 2 }}>{resetResult.tempPassword}</span>
+              <button onClick={() => { navigator.clipboard.writeText(resetResult.tempPassword); }}
+                style={{ padding: "5px 10px", borderRadius: 6, background: "#ff9800", border: "none", color: "#000", fontWeight: 700, cursor: "pointer", fontSize: 12, flexShrink: 0 }}>
+                📋 Copiază
+              </button>
+            </div>
+            <button onClick={() => setResetResult(null)}
+              style={{ width: "100%", padding: "10px", borderRadius: 8, background: "#333", border: "none", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
+              Închide
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

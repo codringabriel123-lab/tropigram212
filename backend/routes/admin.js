@@ -373,4 +373,35 @@ router.put("/users/:id/role", adminAuth, async (req, res) => {
   }
 });
 
+// Reset parolă user — generează o parolă temporară aleatorie și o returnează adminului
+router.post("/users/:id/reset-password", adminAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User negăsit" });
+
+    // Generează parolă temporară de 10 caractere
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+    let tempPassword = "";
+    for (let i = 0; i < 10; i++) {
+      tempPassword += chars[Math.floor(Math.random() * chars.length)];
+    }
+
+    const bcrypt = require("bcryptjs");
+    const hash = await bcrypt.hash(tempPassword, 12);
+    user.password = hash;
+    await user.save();
+
+    await logAction({
+      adminId: req.user._id,
+      action: "reset-password",
+      targetUser: user._id,
+      details: `Parolă resetată pentru ${user.username}`,
+    });
+
+    res.json({ message: "Parolă resetată", tempPassword, username: user.username });
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
 module.exports = router;
