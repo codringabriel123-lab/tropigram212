@@ -1,25 +1,10 @@
-import axios from "axios";
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App.jsx";
+import "./index.css";
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "/api",
-});
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("trp_token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-api.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem("trp_token");
-      localStorage.removeItem("trp_user");
-      window.location.href = "/auth";
-    }
-    return Promise.reject(err);
-  }
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
 );
-
-export default api;

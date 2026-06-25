@@ -1,138 +1,144 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
 import api from "../api";
-import Avatar from "../components/Avatar";
-import PostCard from "../components/PostCard";
 
-const ROLE_COLORS = { Civil: "#888", Politie: "#4a90e2", Mecanic: "#f5a623", Pompier: "#e74c3c", Medic: "#2ecc71", Admin: "#e91e8c" };
-
-export default function ProfilePage() {
-  const { id } = useParams();
-  const { user: me, updateUser } = useAuth();
-  const [profile, setProfile] = useState(null);
-  const [posts, setPosts] = useState([]);
+export default function AdminPage() {
+  const [stats, setStats] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [tab, setTab] = useState("stats");
+  const [search, setSearch] = useState("");
+  const [banReason, setBanReason] = useState("");
   const [loading, setLoading] = useState(true);
-  const [following, setFollowing] = useState(false);
-  const [editMode, setEditMode] = useState(false);
-  const [editForm, setEditForm] = useState({});
-
-  const isMe = id === me?._id;
 
   useEffect(() => {
-    setLoading(true);
-    Promise.all([api.get(`/users/${id}`), api.get(`/posts/user/${id}`)])
-      .then(([u, p]) => {
-        setProfile(u.data);
-        setPosts(p.data);
-        setFollowing(u.data.followers?.map(f => f._id || f).map(String).includes(String(me?._id)));
-        setEditForm({ displayName: u.data.displayName, bio: u.data.bio || "", location: u.data.location || "", role: u.data.role });
-      })
-      .finally(() => setLoading(false));
-  }, [id]);
+    api.get("/admin/stats").then(r => setStats(r.data)).finally(() => setLoading(false));
+  }, []);
 
-  const handleFollow = async () => {
+  useEffect(() => {
+    if (tab === "users") {
+      api.get(`/admin/users?search=${encodeURIComponent(search)}`).then(r => setUsers(r.data.users));
+    }
+  }, [tab, search]);
+
+  const handleBan = async (userId, username) => {
+    const reason = prompt(`Motiv ban pentru ${username}:`);
+    if (reason === null) return;
     try {
-      const res = await api.put(`/users/${id}/follow`);
-      setFollowing(res.data.following);
-      setProfile(prev => ({
-        ...prev,
-        followers: res.data.following
-          ? [...prev.followers, { _id: me._id, username: me.username, avatar: me.avatar }]
-          : prev.followers.filter(f => (f._id || f).toString() !== me._id.toString())
-      }));
+      await api.put(`/admin/users/${userId}/ban`, { reason: reason || "Motiv nespecificat" });
+      setUsers(prev => prev.map(u => u._id === userId ? { ...u, isBanned: true, banReason: reason } : u));
+    } catch (err) {
+      alert(err.response?.data?.message || "Eroare");
+    }
+  };
+
+  const handleUnban = async (userId) => {
+    try {
+      await api.put(`/admin/users/${userId}/unban`);
+      setUsers(prev => prev.map(u => u._id === userId ? { ...u, isBanned: false, banReason: "" } : u));
     } catch {}
   };
 
-  const handleSave = async () => {
+  const handleToggleAdmin = async (userId, username) => {
+    if (!window.confirm(`Modifici rolul de admin pentru ${username}?`)) return;
     try {
-      const res = await api.put("/users/me/update", editForm);
-      setProfile(prev => ({ ...prev, ...res.data }));
-      updateUser(res.data);
-      setEditMode(false);
-    } catch {}
+      const res = await api.put(`/admin/users/${userId}/toggle-admin`);
+      setUsers(prev => prev.map(u => u._id === userId ? { ...u, isAdmin: !u.isAdmin } : u));
+    } catch (err) {
+      alert(err.response?.data?.message || "Eroare");
+    }
   };
-
-  const handleDeletePost = (postId) => setPosts(prev => prev.filter(p => p._id !== postId));
 
   if (loading) return <div style={{ textAlign: "center", padding: "4rem", color: "#555" }}>Se încarcă...</div>;
-  if (!profile) return <div style={{ textAlign: "center", padding: "4rem", color: "#555" }}>Profil negăsit</div>;
 
   return (
-    <div>
-      {/* Profile Header */}
-      <div style={{ padding: "20px 16px 0" }}>
-        <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 16 }}>
-          <Avatar user={profile} size={72} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 800, fontSize: 18 }}>{profile.displayName}</div>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 4 }}>@{profile.username}</div>
-            <span style={{ fontSize: 11, color: ROLE_COLORS[profile.role] || "#888", background: "#111", padding: "3px 10px", borderRadius: 20, border: `1px solid ${ROLE_COLORS[profile.role] || "#333"}` }}>
-              {profile.role}
-            </span>
-          </div>
-        </div>
+    <div style={{ padding: "16px" }}>
+      <div style={{ fontWeight: 800, fontSize: 20, marginBottom: 16, color: "#e91e8c" }}>⚙️ Panel Admin</div>
 
-        {profile.bio && <p style={{ fontSize: 14, color: "#ccc", marginBottom: 12, lineHeight: 1.5 }}>{profile.bio}</p>}
-        {profile.location && <div style={{ fontSize: 13, color: "#666", marginBottom: 12 }}>📍 {profile.location}</div>}
-
-        <div style={{ display: "flex", gap: 24, marginBottom: 16 }}>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>{posts.length}</div>
-            <div style={{ fontSize: 12, color: "#666" }}>postări</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>{profile.followers?.length || 0}</div>
-            <div style={{ fontSize: 12, color: "#666" }}>urmăritori</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>{profile.following?.length || 0}</div>
-            <div style={{ fontSize: 12, color: "#666" }}>urmăriți</div>
-          </div>
-        </div>
-
-        {isMe ? (
-          <button onClick={() => setEditMode(!editMode)}
-            style={{ width: "100%", padding: "9px", borderRadius: 10, border: "1px solid #333", background: "transparent", color: "#fff", fontWeight: 600, cursor: "pointer", marginBottom: 16 }}>
-            {editMode ? "Anulează" : "Editează profilul"}
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        {["stats", "users"].map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            style={{ padding: "8px 18px", borderRadius: 20, border: `1px solid ${tab === t ? "#e91e8c" : "#333"}`, background: tab === t ? "#e91e8c" : "transparent", color: tab === t ? "#fff" : "#888", fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
+            {t === "stats" ? "📊 Statistici" : "👥 Useri"}
           </button>
-        ) : (
-          <button onClick={handleFollow}
-            style={{ width: "100%", padding: "9px", borderRadius: 10, border: `1px solid ${following ? "#333" : "#e91e8c"}`, background: following ? "transparent" : "#e91e8c", color: following ? "#888" : "#fff", fontWeight: 600, cursor: "pointer", marginBottom: 16 }}>
-            {following ? "Urmărești ✓" : "Urmărește"}
-          </button>
-        )}
-
-        {editMode && (
-          <div style={{ background: "#1a1a1a", borderRadius: 12, padding: 16, marginBottom: 16, border: "1px solid #2a2a2a" }}>
-            <input placeholder="Nume afișat" value={editForm.displayName} onChange={e => setEditForm(p => ({ ...p, displayName: e.target.value }))}
-              style={{ width: "100%", background: "#111", border: "1px solid #2a2a2a", borderRadius: 8, padding: "9px 12px", color: "#fff", fontSize: 13, marginBottom: 8 }} />
-            <textarea placeholder="Bio (max 200 caractere)" value={editForm.bio} onChange={e => setEditForm(p => ({ ...p, bio: e.target.value }))} rows={3}
-              style={{ width: "100%", background: "#111", border: "1px solid #2a2a2a", borderRadius: 8, padding: "9px 12px", color: "#fff", fontSize: 13, marginBottom: 8, resize: "none" }} />
-            <input placeholder="Locație" value={editForm.location} onChange={e => setEditForm(p => ({ ...p, location: e.target.value }))}
-              style={{ width: "100%", background: "#111", border: "1px solid #2a2a2a", borderRadius: 8, padding: "9px 12px", color: "#fff", fontSize: 13, marginBottom: 8 }} />
-            <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value }))}
-              style={{ width: "100%", background: "#111", border: "1px solid #2a2a2a", borderRadius: 8, padding: "9px 12px", color: "#fff", fontSize: 13, marginBottom: 12 }}>
-              {["Civil", "Politie", "Mecanic", "Pompier", "Medic"].map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-            <button onClick={handleSave}
-              style={{ width: "100%", padding: "10px", borderRadius: 8, border: "none", background: "#e91e8c", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
-              Salvează modificările
-            </button>
-          </div>
-        )}
-
-        <div style={{ borderBottom: "1px solid #1f1f1f", marginBottom: 0 }} />
+        ))}
       </div>
 
-      {/* Posts */}
-      {posts.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "3rem", color: "#555" }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
-          <div>Nicio postare încă</div>
+      {tab === "stats" && stats && (
+        <div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+            {[
+              { label: "Total Useri", value: stats.totalUsers, icon: "👥", color: "#4a90e2" },
+              { label: "Total Postări", value: stats.totalPosts, icon: "📝", color: "#e91e8c" },
+              { label: "Useri Banați", value: stats.bannedUsers, icon: "🚫", color: "#e74c3c" },
+            ].map(s => (
+              <div key={s.label} style={{ background: "#1a1a1a", borderRadius: 12, padding: "16px", border: "1px solid #2a2a2a" }}>
+                <div style={{ fontSize: 24, marginBottom: 4 }}>{s.icon}</div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: 12, color: "#666" }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ fontWeight: 700, marginBottom: 10 }}>Ultimii useri înregistrați</div>
+          {stats.recentUsers?.map(u => (
+            <div key={u._id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid #1a1a1a" }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#e91e8c", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12 }}>
+                {u.avatar || u.displayName?.slice(0, 2)}
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>{u.username}</div>
+                <div style={{ fontSize: 11, color: "#555" }}>{new Date(u.createdAt).toLocaleDateString("ro-RO")}</div>
+              </div>
+              {u.isBanned && <span style={{ marginLeft: "auto", fontSize: 11, color: "#e74c3c", background: "#2a1a1a", padding: "2px 8px", borderRadius: 20 }}>BANAT</span>}
+            </div>
+          ))}
         </div>
-      ) : (
-        posts.map(p => <PostCard key={p._id} post={p} onDelete={handleDeletePost} />)
+      )}
+
+      {tab === "users" && (
+        <div>
+          <input
+            placeholder="Caută useri..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ width: "100%", background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 10, padding: "10px 14px", color: "#fff", fontSize: 13, marginBottom: 16 }}
+          />
+          {users.map(u => (
+            <div key={u._id} style={{ background: "#1a1a1a", borderRadius: 12, padding: "12px 14px", marginBottom: 8, border: "1px solid #2a2a2a" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <div style={{ width: 38, height: 38, borderRadius: "50%", background: u.isAdmin ? "#e91e8c" : "#333", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12 }}>
+                  {u.avatar || u.displayName?.slice(0, 2)}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                    {u.username}
+                    {u.isAdmin && <span style={{ marginLeft: 6, fontSize: 10, color: "#e91e8c" }}>👑 ADMIN</span>}
+                    {u.isBanned && <span style={{ marginLeft: 6, fontSize: 10, color: "#e74c3c" }}>🚫 BANAT</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#666" }}>{u.role} • {new Date(u.createdAt).toLocaleDateString("ro-RO")}</div>
+                  {u.isBanned && u.banReason && <div style={{ fontSize: 11, color: "#e74c3c", marginTop: 2 }}>Motiv: {u.banReason}</div>}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {!u.isBanned ? (
+                  <button onClick={() => handleBan(u._id, u.username)}
+                    style={{ flex: 1, padding: "7px", borderRadius: 8, border: "1px solid #e74c3c", background: "transparent", color: "#e74c3c", fontWeight: 600, cursor: "pointer", fontSize: 12 }}>
+                    🚫 Banează
+                  </button>
+                ) : (
+                  <button onClick={() => handleUnban(u._id)}
+                    style={{ flex: 1, padding: "7px", borderRadius: 8, border: "1px solid #2ecc71", background: "transparent", color: "#2ecc71", fontWeight: 600, cursor: "pointer", fontSize: 12 }}>
+                    ✅ Debanează
+                  </button>
+                )}
+                <button onClick={() => handleToggleAdmin(u._id, u.username)}
+                  style={{ flex: 1, padding: "7px", borderRadius: 8, border: "1px solid #e91e8c", background: "transparent", color: "#e91e8c", fontWeight: 600, cursor: "pointer", fontSize: 12 }}>
+                  {u.isAdmin ? "Retrogradează" : "👑 Promovează"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

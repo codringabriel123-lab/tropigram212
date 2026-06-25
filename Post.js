@@ -1,59 +1,26 @@
-import { createContext, useContext, useState, useEffect } from "react";
-import api from "../api";
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 
-const AuthContext = createContext(null);
+const auth = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ message: "Neautentificat" });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select("-password");
+    if (!user) return res.status(401).json({ message: "User negăsit" });
+    if (user.isBanned) return res.status(403).json({ message: `Cont banat: ${user.banReason || "Motiv nespecificat"}` });
+    req.user = user;
+    next();
+  } catch (err) {
+    res.status(401).json({ message: "Token invalid" });
+  }
+};
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("trp_user")); } catch { return null; }
+const adminAuth = async (req, res, next) => {
+  await auth(req, res, () => {
+    if (!req.user.isAdmin) return res.status(403).json({ message: "Acces interzis" });
+    next();
   });
-  const [loading, setLoading] = useState(true);
+};
 
-  useEffect(() => {
-    const token = localStorage.getItem("trp_token");
-    if (token) {
-      api.get("/auth/me")
-        .then(res => { setUser(res.data); localStorage.setItem("trp_user", JSON.stringify(res.data)); })
-        .catch(() => { localStorage.removeItem("trp_token"); localStorage.removeItem("trp_user"); setUser(null); })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
-  }, []);
-
-  const login = async (username, password) => {
-    const res = await api.post("/auth/login", { username, password });
-    localStorage.setItem("trp_token", res.data.token);
-    localStorage.setItem("trp_user", JSON.stringify(res.data.user));
-    setUser(res.data.user);
-    return res.data.user;
-  };
-
-  const register = async (data) => {
-    const res = await api.post("/auth/register", data);
-    localStorage.setItem("trp_token", res.data.token);
-    localStorage.setItem("trp_user", JSON.stringify(res.data.user));
-    setUser(res.data.user);
-    return res.data.user;
-  };
-
-  const logout = () => {
-    localStorage.removeItem("trp_token");
-    localStorage.removeItem("trp_user");
-    setUser(null);
-  };
-
-  const updateUser = (data) => {
-    const updated = { ...user, ...data };
-    setUser(updated);
-    localStorage.setItem("trp_user", JSON.stringify(updated));
-  };
-
-  return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export const useAuth = () => useContext(AuthContext);
+module.exports = { auth, adminAuth };

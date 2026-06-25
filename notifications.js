@@ -1,26 +1,25 @@
-const jwt = require("jsonwebtoken");
-const User = require("../models/User");
-
-const auth = async (req, res, next) => {
-  try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ message: "Neautentificat" });
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select("-password");
-    if (!user) return res.status(401).json({ message: "User negăsit" });
-    if (user.isBanned) return res.status(403).json({ message: `Cont banat: ${user.banReason || "Motiv nespecificat"}` });
-    req.user = user;
-    next();
-  } catch (err) {
-    res.status(401).json({ message: "Token invalid" });
+{
+  "name": "tropical-rp-server",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.0",
+    "mongoose": "^7.3.1",
+    "multer": "^1.4.5-lts.1",
+    "express-rate-limit": "^6.7.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
   }
-};
-
-const adminAuth = async (req, res, next) => {
-  await auth(req, res, () => {
-    if (!req.user.isAdmin) return res.status(403).json({ message: "Acces interzis" });
-    next();
-  });
-};
-
-module.exports = { auth, adminAuth };
+}

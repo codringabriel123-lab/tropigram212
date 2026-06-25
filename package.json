@@ -1,63 +1,82 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import api from "../api";
-import Avatar from "../components/Avatar";
 
-const ROLE_COLORS = { Civil: "#888", Politie: "#4a90e2", Mecanic: "#f5a623", Pompier: "#e74c3c", Medic: "#2ecc71", Admin: "#e91e8c" };
+const ROLES = ["Civil", "Politie", "Mecanic", "Pompier", "Medic"];
+const inp = { width: "100%", display: "block", background: "#111", border: "1px solid #2a2a2a", borderRadius: 10, padding: "11px 14px", color: "#fff", fontSize: 14, marginBottom: 10, fontFamily: "inherit" };
 
-export default function MembersPage() {
-  const [users, setUsers] = useState([]);
-  const [myUser, setMyUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function AuthPage() {
+  const { login, register } = useAuth();
   const navigate = useNavigate();
+  const [mode, setMode] = useState("login");
+  const [form, setForm] = useState({ username: "", displayName: "", password: "", role: "Civil" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    Promise.all([api.get("/users"), api.get("/auth/me")])
-      .then(([u, me]) => { setUsers(u.data); setMyUser(me.data); })
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleFollow = async (targetId) => {
+  const handleSubmit = async () => {
+    setError(""); setLoading(true);
     try {
-      const res = await api.put(`/users/${targetId}/follow`);
-      setMyUser(prev => ({
-        ...prev,
-        following: res.data.following
-          ? [...(prev.following || []), targetId]
-          : (prev.following || []).filter(id => id !== targetId)
-      }));
-    } catch {}
+      if (mode === "login") {
+        await login(form.username, form.password);
+      } else {
+        await register({ username: form.username, displayName: form.displayName, password: form.password, role: form.role });
+      }
+      navigate("/");
+    } catch (err) {
+      setError(err.response?.data?.message || "A apărut o eroare");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (loading) return <div style={{ textAlign: "center", padding: "4rem", color: "#555" }}>Se încarcă...</div>;
-
   return (
-    <div style={{ padding: "16px" }}>
-      <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>Membri ({users.length})</div>
-      {users.map(u => {
-        const isMe = u._id === myUser?._id;
-        const isFollowing = myUser?.following?.map(id => id.toString()).includes(u._id.toString());
-        return (
-          <div key={u._id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #1f1f1f" }}>
-            <div onClick={() => navigate(`/profile/${u._id}`)} style={{ cursor: "pointer" }}><Avatar user={u} size={46} /></div>
-            <div style={{ flex: 1, cursor: "pointer" }} onClick={() => navigate(`/profile/${u._id}`)}>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>{u.username}</div>
-              <div style={{ fontSize: 12, color: "#666" }}>{u.bio?.slice(0, 45)}</div>
-              <span style={{ fontSize: 10, color: ROLE_COLORS[u.role] || "#888", background: "#111", padding: "2px 8px", borderRadius: 20, border: `1px solid ${ROLE_COLORS[u.role] || "#333"}`, marginTop: 4, display: "inline-block" }}>{u.role}</span>
-            </div>
-            <div style={{ fontSize: 12, color: "#555", textAlign: "center", marginRight: 8 }}>
-              <div style={{ fontWeight: 700, color: "#fff" }}>{u.followers?.length || 0}</div>
-              <div>urmăritori</div>
-            </div>
-            {!isMe && (
-              <button onClick={() => handleFollow(u._id)}
-                style={{ padding: "7px 16px", borderRadius: 20, border: `1px solid ${isFollowing ? "#333" : "#e91e8c"}`, background: isFollowing ? "transparent" : "#e91e8c", color: isFollowing ? "#888" : "#fff", fontWeight: 600, cursor: "pointer", fontSize: 12, whiteSpace: "nowrap" }}>
-                {isFollowing ? "Urmărești" : "Urmărește"}
+    <div style={{ minHeight: "100vh", background: "#0d0d0d", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+      <div style={{ width: "100%", maxWidth: 420 }}>
+        <div style={{ textAlign: "center", marginBottom: "2rem" }}>
+          <div style={{ fontSize: 52, marginBottom: 8 }}>🌴</div>
+          <div style={{ fontSize: 30, fontWeight: 800, color: "#fff", letterSpacing: -1 }}>TROPICAL</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#e91e8c", letterSpacing: 4 }}>ROMÂNIA ROLEPLAY</div>
+          <div style={{ fontSize: 13, color: "#555", marginTop: 6 }}>Comunitatea ta de roleplay</div>
+        </div>
+
+        <div style={{ background: "#1a1a1a", borderRadius: 16, padding: "2rem", border: "1px solid #2a2a2a" }}>
+          <div style={{ display: "flex", gap: 0, marginBottom: "1.5rem", background: "#111", borderRadius: 10, padding: 4 }}>
+            {["login", "register"].map(m => (
+              <button key={m} onClick={() => { setMode(m); setError(""); }}
+                style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "none", background: mode === m ? "#e91e8c" : "transparent", color: mode === m ? "#fff" : "#666", fontWeight: 600, cursor: "pointer", fontSize: 14 }}>
+                {m === "login" ? "Conectare" : "Înregistrare"}
               </button>
-            )}
+            ))}
           </div>
-        );
-      })}
+
+          <input placeholder="Username" value={form.username} onChange={e => setForm(p => ({ ...p, username: e.target.value }))} style={inp} autoComplete="username" />
+
+          {mode === "register" && (
+            <input placeholder="Nume afișat (ex: Andrei)" value={form.displayName} onChange={e => setForm(p => ({ ...p, displayName: e.target.value }))} style={inp} />
+          )}
+
+          <input placeholder="Parolă" type="password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} onKeyDown={e => e.key === "Enter" && handleSubmit()} style={inp} autoComplete="current-password" />
+
+          {mode === "register" && (
+            <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))} style={{ ...inp, color: "#fff" }}>
+              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          )}
+
+          {error && <p style={{ color: "#e91e8c", fontSize: 13, marginBottom: 10, textAlign: "center" }}>{error}</p>}
+
+          <button onClick={handleSubmit} disabled={loading}
+            style={{ width: "100%", padding: "13px", borderRadius: 10, border: "none", background: "#e91e8c", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", opacity: loading ? 0.7 : 1 }}>
+            {loading ? "Se încarcă..." : mode === "login" ? "Conectează-te" : "Creează cont"}
+          </button>
+
+          {mode === "register" && (
+            <p style={{ fontSize: 11, color: "#444", textAlign: "center", marginTop: 12 }}>
+              Primul cont creat primește automat drepturi de admin 👑
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
