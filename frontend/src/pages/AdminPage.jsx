@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import api from "../api";
+import Avatar from "../components/Avatar";
 
 export default function AdminPage() {
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [tab, setTab] = useState("stats");
   const [search, setSearch] = useState("");
-  const [banReason, setBanReason] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function AdminPage() {
   const handleToggleAdmin = async (userId, username) => {
     if (!window.confirm(`Modifici rolul de admin pentru ${username}?`)) return;
     try {
-      const res = await api.put(`/admin/users/${userId}/toggle-admin`);
+      await api.put(`/admin/users/${userId}/toggle-admin`);
       setUsers(prev => prev.map(u => u._id === userId ? { ...u, isAdmin: !u.isAdmin } : u));
     } catch (err) {
       alert(err.response?.data?.message || "Eroare");
@@ -53,7 +53,6 @@ export default function AdminPage() {
     <div style={{ padding: "16px" }}>
       <div style={{ fontWeight: 800, fontSize: 20, marginBottom: 16, color: "#e91e8c" }}>⚙️ Panel Admin</div>
 
-      {/* Tabs */}
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         {["stats", "users"].map(t => (
           <button key={t} onClick={() => setTab(t)}
@@ -82,9 +81,7 @@ export default function AdminPage() {
           <div style={{ fontWeight: 700, marginBottom: 10 }}>Ultimii useri înregistrați</div>
           {stats.recentUsers?.map(u => (
             <div key={u._id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid #1a1a1a" }}>
-              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#e91e8c", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12 }}>
-                {u.avatar || u.displayName?.slice(0, 2)}
-              </div>
+              <Avatar user={u} size={36} />
               <div>
                 <div style={{ fontWeight: 600, fontSize: 13 }}>{u.username}</div>
                 <div style={{ fontSize: 11, color: "#555" }}>{new Date(u.createdAt).toLocaleDateString("ro-RO")}</div>
@@ -101,14 +98,12 @@ export default function AdminPage() {
             placeholder="Caută useri..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ width: "100%", background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 10, padding: "10px 14px", color: "#fff", fontSize: 13, marginBottom: 16 }}
+            style={{ width: "100%", background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 10, padding: "10px 14px", color: "#fff", fontSize: 13, marginBottom: 16, boxSizing: "border-box" }}
           />
           {users.map(u => (
             <div key={u._id} style={{ background: "#1a1a1a", borderRadius: 12, padding: "12px 14px", marginBottom: 8, border: "1px solid #2a2a2a" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                <div style={{ width: 38, height: 38, borderRadius: "50%", background: u.isAdmin ? "#e91e8c" : "#333", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12 }}>
-                  {u.avatar || u.displayName?.slice(0, 2)}
-                </div>
+                <Avatar user={u} size={38} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 14 }}>
                     {u.username}
