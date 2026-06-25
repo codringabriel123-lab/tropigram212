@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../api";
@@ -6,6 +6,7 @@ import Avatar from "../components/Avatar";
 import PostCard from "../components/PostCard";
 
 const ROLE_COLORS = { Civil: "#888", Politie: "#4a90e2", Mecanic: "#f5a623", Pompier: "#e74c3c", Medic: "#2ecc71", Admin: "#e91e8c" };
+const ROLES = ["Civil", "Politie", "Mecanic", "Pompier", "Medic"];
 
 export default function ProfilePage() {
   const { id } = useParams();
@@ -16,20 +17,47 @@ export default function ProfilePage() {
   const [following, setFollowing] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [avatarBase64, setAvatarBase64] = useState(null);
+  const fileInputRef = useRef();
 
   const isMe = id === me?._id;
 
   useEffect(() => {
     setLoading(true);
+    setEditMode(false);
+    setAvatarPreview(null);
+    setAvatarBase64(null);
     Promise.all([api.get(`/users/${id}`), api.get(`/posts/user/${id}`)])
       .then(([u, p]) => {
         setProfile(u.data);
         setPosts(p.data);
         setFollowing(u.data.followers?.map(f => f._id || f).map(String).includes(String(me?._id)));
-        setEditForm({ displayName: u.data.displayName, bio: u.data.bio || "", location: u.data.location || "", role: u.data.role });
+        setEditForm({
+          displayName: u.data.displayName,
+          bio: u.data.bio || "",
+          location: u.data.location || "",
+          role: u.data.role,
+        });
       })
       .finally(() => setLoading(false));
   }, [id]);
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Imaginea e prea mare (max 5MB)");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result);
+      setAvatarBase64(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleFollow = async () => {
     try {
@@ -39,18 +67,27 @@ export default function ProfilePage() {
         ...prev,
         followers: res.data.following
           ? [...prev.followers, { _id: me._id, username: me.username, avatar: me.avatar }]
-          : prev.followers.filter(f => (f._id || f).toString() !== me._id.toString())
+          : prev.followers.filter(f => (f._id || f).toString() !== me._id.toString()),
       }));
     } catch {}
   };
 
   const handleSave = async () => {
+    setSaving(true);
     try {
-      const res = await api.put("/users/me/update", editForm);
+      const payload = { ...editForm };
+      if (avatarBase64) payload.avatarBase64 = avatarBase64;
+      const res = await api.put("/users/me/update", payload);
       setProfile(prev => ({ ...prev, ...res.data }));
       updateUser(res.data);
       setEditMode(false);
-    } catch {}
+      setAvatarPreview(null);
+      setAvatarBase64(null);
+    } catch (err) {
+      alert(err.response?.data?.message || "Eroare la salvare");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDeletePost = (postId) => setPosts(prev => prev.filter(p => p._id !== postId));
@@ -58,12 +95,41 @@ export default function ProfilePage() {
   if (loading) return <div style={{ textAlign: "center", padding: "4rem", color: "#555" }}>Se încarcă...</div>;
   if (!profile) return <div style={{ textAlign: "center", padding: "4rem", color: "#555" }}>Profil negăsit</div>;
 
+  const displayAvatar = avatarPreview
+    ? { avatar: avatarPreview }
+    : profile;
+
   return (
     <div>
-      {/* Profile Header */}
       <div style={{ padding: "20px 16px 0" }}>
         <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 16 }}>
-          <Avatar user={profile} size={72} />
+          {/* Avatar cu buton de upload dacă e profilul meu */}
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <Avatar user={displayAvatar} size={72} />
+            {isMe && editMode && (
+              <>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    position: "absolute", bottom: -2, right: -2,
+                    width: 24, height: 24, borderRadius: "50%",
+                    background: "#e91e8c", border: "2px solid #0d0d0d",
+                    color: "#fff", fontSize: 12, cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
+                  title="Schimbă poza"
+                >📷</button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  style={{ display: "none" }}
+                />
+              </>
+            )}
+          </div>
+
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 800, fontSize: 18 }}>{profile.displayName}</div>
             <div style={{ fontSize: 13, color: "#666", marginBottom: 4 }}>@{profile.username}</div>
@@ -73,8 +139,12 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {profile.bio && <p style={{ fontSize: 14, color: "#ccc", marginBottom: 12, lineHeight: 1.5 }}>{profile.bio}</p>}
-        {profile.location && <div style={{ fontSize: 13, color: "#666", marginBottom: 12 }}>📍 {profile.location}</div>}
+        {profile.bio && !editMode && (
+          <p style={{ fontSize: 14, color: "#ccc", marginBottom: 12, lineHeight: 1.5 }}>{profile.bio}</p>
+        )}
+        {profile.location && !editMode && (
+          <div style={{ fontSize: 13, color: "#666", marginBottom: 12 }}>📍 {profile.location}</div>
+        )}
 
         <div style={{ display: "flex", gap: 24, marginBottom: 16 }}>
           <div style={{ textAlign: "center" }}>
@@ -92,32 +162,71 @@ export default function ProfilePage() {
         </div>
 
         {isMe ? (
-          <button onClick={() => setEditMode(!editMode)}
-            style={{ width: "100%", padding: "9px", borderRadius: 10, border: "1px solid #333", background: "transparent", color: "#fff", fontWeight: 600, cursor: "pointer", marginBottom: 16 }}>
-            {editMode ? "Anulează" : "Editează profilul"}
+          <button
+            onClick={() => { setEditMode(!editMode); setAvatarPreview(null); setAvatarBase64(null); }}
+            style={{ width: "100%", padding: "9px", borderRadius: 10, border: "1px solid #333", background: "transparent", color: "#fff", fontWeight: 600, cursor: "pointer", marginBottom: 16 }}
+          >
+            {editMode ? "Anulează" : "✏️ Editează profilul"}
           </button>
         ) : (
-          <button onClick={handleFollow}
-            style={{ width: "100%", padding: "9px", borderRadius: 10, border: `1px solid ${following ? "#333" : "#e91e8c"}`, background: following ? "transparent" : "#e91e8c", color: following ? "#888" : "#fff", fontWeight: 600, cursor: "pointer", marginBottom: 16 }}>
+          <button
+            onClick={handleFollow}
+            style={{ width: "100%", padding: "9px", borderRadius: 10, border: `1px solid ${following ? "#333" : "#e91e8c"}`, background: following ? "transparent" : "#e91e8c", color: following ? "#888" : "#fff", fontWeight: 600, cursor: "pointer", marginBottom: 16 }}
+          >
             {following ? "Urmărești ✓" : "Urmărește"}
           </button>
         )}
 
         {editMode && (
           <div style={{ background: "#1a1a1a", borderRadius: 12, padding: 16, marginBottom: 16, border: "1px solid #2a2a2a" }}>
-            <input placeholder="Nume afișat" value={editForm.displayName} onChange={e => setEditForm(p => ({ ...p, displayName: e.target.value }))}
-              style={{ width: "100%", background: "#111", border: "1px solid #2a2a2a", borderRadius: 8, padding: "9px 12px", color: "#fff", fontSize: 13, marginBottom: 8 }} />
-            <textarea placeholder="Bio (max 200 caractere)" value={editForm.bio} onChange={e => setEditForm(p => ({ ...p, bio: e.target.value }))} rows={3}
-              style={{ width: "100%", background: "#111", border: "1px solid #2a2a2a", borderRadius: 8, padding: "9px 12px", color: "#fff", fontSize: 13, marginBottom: 8, resize: "none" }} />
-            <input placeholder="Locație" value={editForm.location} onChange={e => setEditForm(p => ({ ...p, location: e.target.value }))}
-              style={{ width: "100%", background: "#111", border: "1px solid #2a2a2a", borderRadius: 8, padding: "9px 12px", color: "#fff", fontSize: 13, marginBottom: 8 }} />
-            <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value }))}
-              style={{ width: "100%", background: "#111", border: "1px solid #2a2a2a", borderRadius: 8, padding: "9px 12px", color: "#fff", fontSize: 13, marginBottom: 12 }}>
-              {["Civil", "Politie", "Mecanic", "Pompier", "Medic"].map(r => <option key={r} value={r}>{r}</option>)}
+            <label style={{ fontSize: 11, color: "#666", marginBottom: 4, display: "block" }}>Nume afișat</label>
+            <input
+              placeholder="Nume afișat"
+              value={editForm.displayName}
+              onChange={e => setEditForm(p => ({ ...p, displayName: e.target.value }))}
+              style={{ width: "100%", background: "#111", border: "1px solid #2a2a2a", borderRadius: 8, padding: "9px 12px", color: "#fff", fontSize: 13, marginBottom: 10, boxSizing: "border-box" }}
+            />
+
+            <label style={{ fontSize: 11, color: "#666", marginBottom: 4, display: "block" }}>Biografie</label>
+            <textarea
+              placeholder="Spune ceva despre tine... (max 200 caractere)"
+              value={editForm.bio}
+              onChange={e => setEditForm(p => ({ ...p, bio: e.target.value.slice(0, 200) }))}
+              rows={3}
+              style={{ width: "100%", background: "#111", border: "1px solid #2a2a2a", borderRadius: 8, padding: "9px 12px", color: "#fff", fontSize: 13, marginBottom: 4, resize: "none", boxSizing: "border-box" }}
+            />
+            <div style={{ fontSize: 11, color: "#555", textAlign: "right", marginBottom: 10 }}>{editForm.bio.length}/200</div>
+
+            <label style={{ fontSize: 11, color: "#666", marginBottom: 4, display: "block" }}>Locație</label>
+            <input
+              placeholder="Locație (ex: Los Santos)"
+              value={editForm.location}
+              onChange={e => setEditForm(p => ({ ...p, location: e.target.value }))}
+              style={{ width: "100%", background: "#111", border: "1px solid #2a2a2a", borderRadius: 8, padding: "9px 12px", color: "#fff", fontSize: 13, marginBottom: 10, boxSizing: "border-box" }}
+            />
+
+            <label style={{ fontSize: 11, color: "#666", marginBottom: 4, display: "block" }}>Rol</label>
+            <select
+              value={editForm.role}
+              onChange={e => setEditForm(p => ({ ...p, role: e.target.value }))}
+              style={{ width: "100%", background: "#111", border: "1px solid #2a2a2a", borderRadius: 8, padding: "9px 12px", color: "#fff", fontSize: 13, marginBottom: 14, boxSizing: "border-box" }}
+            >
+              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
-            <button onClick={handleSave}
-              style={{ width: "100%", padding: "10px", borderRadius: 8, border: "none", background: "#e91e8c", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
-              Salvează modificările
+
+            {avatarPreview && (
+              <div style={{ marginBottom: 12, textAlign: "center" }}>
+                <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>Previzualizare avatar:</div>
+                <img src={avatarPreview} alt="preview" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", border: "2px solid #e91e8c" }} />
+              </div>
+            )}
+
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              style={{ width: "100%", padding: "10px", borderRadius: 8, border: "none", background: "#e91e8c", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: saving ? 0.7 : 1 }}
+            >
+              {saving ? "Se salvează..." : "💾 Salvează modificările"}
             </button>
           </div>
         )}
@@ -125,7 +234,6 @@ export default function ProfilePage() {
         <div style={{ borderBottom: "1px solid #1f1f1f", marginBottom: 0 }} />
       </div>
 
-      {/* Posts */}
       {posts.length === 0 ? (
         <div style={{ textAlign: "center", padding: "3rem", color: "#555" }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
