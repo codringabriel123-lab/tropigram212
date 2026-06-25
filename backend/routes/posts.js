@@ -1,0 +1,139 @@
+const router = require("express").Router();
+const Post = require("../models/Post");
+const Notification = require("../models/Notification");
+const { auth } = require("../middleware/auth");
+
+// Feed - postări de la userii urmăriți + proprii
+router.get("/feed", auth, async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const following = [...req.user.following, req.user._id];
+    const posts = await Post.find({ author: { $in: following }, isDeleted: false })
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(Number(limit))
+      .populate("author", "username displayName avatar role location")
+      .populate("comments.author", "username displayName avatar");
+    res.json(posts);
+  } catch (err) {
+    res.status(500).json({ message: "Eroare la încărcarea feed-ului" });
+  }
+});
+
+// Toate postările (explore)
+router.get("/explore", auth, async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const posts = await Post.find({ isDeleted: false })
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(Number(limit))
+      .populate("author", "username displayName avatar role location");
+    res.json(posts);
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
+// Postările unui user
+router.get("/user/:userId", auth, async (req, res) => {
+  try {
+    const posts = await Post.find({ author: req.params.userId, isDeleted: false })
+      .sort({ createdAt: -1 })
+      .populate("author", "username displayName avatar role")
+      .populate("comments.author", "username displayName avatar");
+    res.json(posts);
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
+// Creare postare
+router.post("/", auth, async (req, res) => {
+  try {
+    const { content, image, location } = req.body;
+    if (!content?.trim()) return res.status(400).json({ message: "Conținutul este obligatoriu" });
+    const post = new Post({ author: req.user._id, content: content.trim(), image: image || "", location: location || "" });
+    await post.save();
+    await post.populate("author", "username displayName avatar role location");
+    res.status(201).json(post);
+  } catch (err) {
+    res.status(500).json({ message: "Eroare la postare" });
+  }
+});
+
+// Like/unlike
+router.put("/:id/like", auth, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post || post.isDeleted) return res.status(404).json({ message: "Postare negăsită" });
+    const liked = post.likes.includes(req.user._id);
+    if (liked) {
+      post.likes.pull(req.user._id);
+    } else {
+      post.likes.push(req.user._id);
+      if (post.author.toString() !== req.user._id.toString()) {
+        await Notification.create({ recipient: post.author, sender: req.user._id, type: "like", post: post._id });
+      }
+    }
+    await post.save();
+    res.json({ likes: post.likes, liked: !liked });
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
+// Adaugă comentariu
+router.post("/:id/comment", auth, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text?.trim()) return res.status(400).json({ message: "Comentariul este gol" });
+    const post = await Post.findById(req.params.id);
+    if (!post || post.isDeleted) return res.status(404).json({ message: "Postare negăsită" });
+    post.comments.push({ author: req.user._id, text: text.trim() });
+    await post.save();
+    if (post.author.toString() !== req.user._id.toString()) {
+      await Notification.create({ recipient: post.author, sender: req.user._id, type: "comment", post: post._id });
+    }
+    const updated = await Post.findById(post._id).populate("comments.author", "username displayName avatar");
+    res.json(updated.comments[updated.comments.length - 1]);
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
+// Șterge comentariu
+router.delete("/:postId/comment/:commentId", auth, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.postId);
+    if (!post) return res.status(404).json({ message: "Postare negăsită" });
+    const comment = post.comments.id(req.params.commentId);
+    if (!comment) return res.status(404).json({ message: "Comentariu negăsit" });
+    if (comment.author.toString() !== req.user._id.toString() && !req.user.isAdmin)
+      return res.status(403).json({ message: "Acces interzis" });
+    post.comments.pull(req.params.commentId);
+    await post.save();
+    res.json({ message: "Comentariu șters" });
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
+// Șterge postare
+router.delete("/:id", auth, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: "Postare negăsită" });
+    if (post.author.toString() !== req.user._id.toString() && !req.user.isAdmin)
+      return res.status(403).json({ message: "Acces interzis" });
+    post.isDeleted = true;
+    post.deletedBy = req.user._id;
+    post.deletedAt = new Date();
+    await post.save();
+    res.json({ message: "Postare ștearsă" });
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
+module.exports = router;
