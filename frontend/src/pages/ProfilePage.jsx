@@ -131,7 +131,10 @@ export default function ProfilePage() {
           </div>
 
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 800, fontSize: 18 }}>{profile.displayName}</div>
+            <div style={{ fontWeight: 800, fontSize: 18, display: "flex", alignItems: "center", gap: 6 }}>
+              {profile.displayName}
+              {profile.isVerified && <span style={{ color: "#1da1f2", fontSize: 16 }} title="Cont verificat">✓</span>}
+            </div>
             <div style={{ fontSize: 13, color: "#666", marginBottom: 4 }}>@{profile.username}</div>
             <span style={{ fontSize: 11, color: ROLE_COLORS[profile.role] || "#888", background: "#111", padding: "3px 10px", borderRadius: 20, border: `1px solid ${ROLE_COLORS[profile.role] || "#333"}` }}>
               {profile.role}

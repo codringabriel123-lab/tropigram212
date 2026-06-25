@@ -8,6 +8,7 @@ const auditLogSchema = new mongoose.Schema({
     enum: [
       "ban", "unban", "mute", "unmute",
       "toggle-admin", "delete-post", "restore-post", "delete-comment",
+      "verify", "unverify",
     ],
   },
   targetUser: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

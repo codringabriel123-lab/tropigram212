@@ -18,6 +18,8 @@ const ACTION_LABELS = {
   "delete-post": { label: "Șterge postare", icon: "🗑️", color: "#e74c3c" },
   "restore-post": { label: "Restaurează postare", icon: "♻️", color: "#2ecc71" },
   "delete-comment": { label: "Șterge comentariu", icon: "💬", color: "#e74c3c" },
+  "verify": { label: "Verificat", icon: "✅", color: "#1da1f2" },
+  "unverify": { label: "Verificare eliminată", icon: "❌", color: "#888" },
 };
 
 // Modal simplu pentru alegerea motivului + duratei (folosit pentru ban și mute)
@@ -129,8 +131,18 @@ export default function AdminPage() {
     } catch {}
   };
 
-  const handleToggleAdmin = async (userId, username) => {
-    if (!window.confirm(`Modifici rolul de admin pentru ${username}?`)) return;
+  const handleToggleVerify = async (userId, username, currentVerified) => {
+    const action = currentVerified ? "Elimini verificarea" : "Verifici";
+    if (!window.confirm(`${action} contul lui ${username}?`)) return;
+    try {
+      const r = await api.put(`/admin/users/${userId}/toggle-verify`);
+      setUsers(prev => prev.map(u => u._id === userId ? { ...u, isVerified: r.data.user.isVerified } : u));
+    } catch (err) {
+      alert(err.response?.data?.message || "Eroare");
+    }
+  };
+
+  const handleToggleAdmin = async (userId, username) => {    if (!window.confirm(`Modifici rolul de admin pentru ${username}?`)) return;
     try {
       await api.put(`/admin/users/${userId}/toggle-admin`);
       setUsers(prev => prev.map(u => u._id === userId ? { ...u, isAdmin: !u.isAdmin } : u));
@@ -207,6 +219,7 @@ export default function AdminPage() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 14 }}>
                     {u.username}
+                    {u.isVerified && <span style={{ marginLeft: 6, fontSize: 10, color: "#1da1f2" }}>✓ VERIFICAT</span>}
                     {u.isAdmin && <span style={{ marginLeft: 6, fontSize: 10, color: "#e91e8c" }}>👑 ADMIN</span>}
                     {u.isBanned && <span style={{ marginLeft: 6, fontSize: 10, color: "#e74c3c" }}>🚫 BANAT</span>}
                     {u.isMuted && <span style={{ marginLeft: 6, fontSize: 10, color: "#f39c12" }}>🔇 MUTE</span>}
@@ -252,6 +265,11 @@ export default function AdminPage() {
                 <button onClick={() => handleToggleAdmin(u._id, u.username)}
                   style={{ flex: "1 1 100%", padding: "7px", borderRadius: 8, border: "1px solid #e91e8c", background: "transparent", color: "#e91e8c", fontWeight: 600, cursor: "pointer", fontSize: 12 }}>
                   {u.isAdmin ? "Retrogradează" : "👑 Promovează"}
+                </button>
+
+                <button onClick={() => handleToggleVerify(u._id, u.username, u.isVerified)}
+                  style={{ flex: "1 1 100%", padding: "7px", borderRadius: 8, border: `1px solid ${u.isVerified ? "#888" : "#1da1f2"}`, background: "transparent", color: u.isVerified ? "#888" : "#1da1f2", fontWeight: 600, cursor: "pointer", fontSize: 12 }}>
+                  {u.isVerified ? "❌ Elimină verificarea" : "✓ Verifică contul"}
                 </button>
               </div>
             </div>

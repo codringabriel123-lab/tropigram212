@@ -71,6 +71,7 @@ export default function PostCard({ post: initialPost, onDelete }) {
         <div style={{ flex: 1 }}>
           <div onClick={() => navigate(`/profile/${post.author?._id}`)} style={{ fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
             {post.author?.displayName || post.author?.username}
+            {post.author?.isVerified && <span style={{ marginLeft: 4, color: "#1da1f2", fontSize: 13 }} title="Cont verificat">✓</span>}
           </div>
           <div style={{ fontSize: 12, color: "#555" }}>
             @{post.author?.username}

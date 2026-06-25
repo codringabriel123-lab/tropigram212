@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema({
   followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   following: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   isAdmin: { type: Boolean, default: false },
+  isVerified: { type: Boolean, default: false },
   isBanned: { type: Boolean, default: false },
   banReason: { type: String, default: "" },
   bannedAt: { type: Date },

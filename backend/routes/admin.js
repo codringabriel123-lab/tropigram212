@@ -262,4 +262,25 @@ router.get("/audit-log", adminAuth, async (req, res) => {
   }
 });
 
+// Toggle verified
+router.put("/users/:id/toggle-verify", adminAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User negăsit" });
+    user.isVerified = !user.isVerified;
+    await user.save();
+
+    await logAction({
+      adminId: req.user._id,
+      action: user.isVerified ? "verify" : "unverify",
+      targetUser: user._id,
+      details: user.isVerified ? "cont verificat ✓" : "verificare eliminată",
+    });
+
+    res.json({ message: `${user.username} este acum ${user.isVerified ? "verificat ✓" : "neverificat"}`, user });
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
 module.exports = router;
