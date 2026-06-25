@@ -8,7 +8,28 @@ const auth = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id).select("-password");
     if (!user) return res.status(401).json({ message: "User negăsit" });
+
+    // Ban temporar expirat -> se ridică automat
+    if (user.isBanned && user.banExpiresAt && user.banExpiresAt <= new Date()) {
+      user.isBanned = false;
+      user.banReason = "";
+      user.bannedAt = null;
+      user.bannedBy = null;
+      user.banExpiresAt = null;
+      await user.save();
+    }
     if (user.isBanned) return res.status(403).json({ message: `Cont banat: ${user.banReason || "Motiv nespecificat"}` });
+
+    // Mute temporar expirat -> se ridică automat
+    if (user.isMuted && user.muteExpiresAt && user.muteExpiresAt <= new Date()) {
+      user.isMuted = false;
+      user.muteReason = "";
+      user.mutedAt = null;
+      user.mutedBy = null;
+      user.muteExpiresAt = null;
+      await user.save();
+    }
+
     req.user = user;
     next();
   } catch (err) {
@@ -23,4 +44,12 @@ const adminAuth = async (req, res, next) => {
   });
 };
 
-module.exports = { auth, adminAuth };
+// Blochează postare/comentariu/like dacă userul e mut; navigarea/citirea rămân libere
+const muteCheck = (req, res, next) => {
+  if (req.user.isMuted) {
+    return res.status(403).json({ message: `Nu poți posta, comenta sau da like: ${req.user.muteReason || "Motiv nespecificat"}` });
+  }
+  next();
+};
+
+module.exports = { auth, adminAuth, muteCheck };

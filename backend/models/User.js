@@ -15,6 +15,12 @@ const userSchema = new mongoose.Schema({
   banReason: { type: String, default: "" },
   bannedAt: { type: Date },
   bannedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  banExpiresAt: { type: Date, default: null }, // null = ban permanent
+  isMuted: { type: Boolean, default: false },
+  muteReason: { type: String, default: "" },
+  mutedAt: { type: Date },
+  mutedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  muteExpiresAt: { type: Date, default: null }, // null = mute permanent
   createdAt: { type: Date, default: Date.now },
   lastSeen: { type: Date, default: Date.now },
 });

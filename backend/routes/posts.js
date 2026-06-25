@@ -1,7 +1,7 @@
 const router = require("express").Router();
 const Post = require("../models/Post");
 const Notification = require("../models/Notification");
-const { auth } = require("../middleware/auth");
+const { auth, muteCheck } = require("../middleware/auth");
 
 // Feed - postări de la userii urmăriți + proprii
 router.get("/feed", auth, async (req, res) => {
@@ -49,7 +49,7 @@ router.get("/user/:userId", auth, async (req, res) => {
 });
 
 // Creare postare
-router.post("/", auth, async (req, res) => {
+router.post("/", auth, muteCheck, async (req, res) => {
   try {
     const { content, image, location } = req.body;
     if (!content?.trim()) return res.status(400).json({ message: "Conținutul este obligatoriu" });
@@ -63,7 +63,7 @@ router.post("/", auth, async (req, res) => {
 });
 
 // Like/unlike
-router.put("/:id/like", auth, async (req, res) => {
+router.put("/:id/like", auth, muteCheck, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
     if (!post || post.isDeleted) return res.status(404).json({ message: "Postare negăsită" });
@@ -84,7 +84,7 @@ router.put("/:id/like", auth, async (req, res) => {
 });
 
 // Adaugă comentariu
-router.post("/:id/comment", auth, async (req, res) => {
+router.post("/:id/comment", auth, muteCheck, async (req, res) => {
   try {
     const { text } = req.body;
     if (!text?.trim()) return res.status(400).json({ message: "Comentariul este gol" });
