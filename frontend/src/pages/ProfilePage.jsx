@@ -16,6 +16,8 @@ export default function ProfilePage() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [following, setFollowing] = useState(false);
+  const [followsMe, setFollowsMe] = useState(false);
+  const [showFollowModal, setShowFollowModal] = useState(null); // "followers" | "following" | null
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
@@ -35,6 +37,7 @@ export default function ProfilePage() {
         setProfile(u.data);
         setPosts(p.data);
         setFollowing(u.data.followers?.map(f => f._id || f).map(String).includes(String(me?._id)));
+        setFollowsMe(u.data.following?.map(f => f._id || f).map(String).includes(String(me?._id)));
         setEditForm({
           displayName: u.data.displayName,
           bio: u.data.bio || "",
@@ -155,13 +158,13 @@ export default function ProfilePage() {
             <div style={{ fontWeight: 700, fontSize: 16 }}>{posts.length}</div>
             <div style={{ fontSize: 12, color: "#666" }}>postări</div>
           </div>
-          <div style={{ textAlign: "center" }}>
+          <div style={{ textAlign: "center", cursor: "pointer" }} onClick={() => setShowFollowModal("followers")}>
             <div style={{ fontWeight: 700, fontSize: 16 }}>{profile.followers?.length || 0}</div>
-            <div style={{ fontSize: 12, color: "#666" }}>urmăritori</div>
+            <div style={{ fontSize: 12, color: "#e91e8c" }}>urmăritori</div>
           </div>
-          <div style={{ textAlign: "center" }}>
+          <div style={{ textAlign: "center", cursor: "pointer" }} onClick={() => setShowFollowModal("following")}>
             <div style={{ fontWeight: 700, fontSize: 16 }}>{profile.following?.length || 0}</div>
-            <div style={{ fontSize: 12, color: "#666" }}>urmăriți</div>
+            <div style={{ fontSize: 12, color: "#e91e8c" }}>urmăriți</div>
           </div>
         </div>
 
@@ -173,20 +176,35 @@ export default function ProfilePage() {
             {editMode ? "Anulează" : "✏️ Editează profilul"}
           </button>
         ) : (
-          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-            <button
-              onClick={handleFollow}
-              style={{ flex: 1, padding: "9px", borderRadius: 10, border: `1px solid ${following ? "#333" : "#e91e8c"}`, background: following ? "transparent" : "#e91e8c", color: following ? "#888" : "#fff", fontWeight: 600, cursor: "pointer" }}
-            >
-              {following ? "Urmărești ✓" : "Urmărește"}
-            </button>
-            <button
-              onClick={() => navigate(`/messages?with=${profile._id}`)}
-              style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid #333", background: "transparent", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 16 }}
-              title="Trimite mesaj"
-            >
-              💬
-            </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+            {followsMe && (
+              <div style={{ fontSize: 12, color: "#888", textAlign: "center", background: "#1a1a1a", borderRadius: 8, padding: "4px 0" }}>
+                Te urmărește
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={handleFollow}
+                style={{
+                  flex: 1, padding: "9px", borderRadius: 10,
+                  border: `1px solid ${following ? (followsMe ? "#e91e8c" : "#333") : "#e91e8c"}`,
+                  background: following ? "transparent" : "#e91e8c",
+                  color: following ? (followsMe ? "#e91e8c" : "#888") : "#fff",
+                  fontWeight: 600, cursor: "pointer"
+                }}
+              >
+                {following
+                  ? (followsMe ? "🔁 Urmărire reciprocă" : "Urmărești ✓")
+                  : (followsMe ? "Urmărește înapoi" : "Urmărește")}
+              </button>
+              <button
+                onClick={() => navigate(`/messages?with=${profile._id}`)}
+                style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid #333", background: "transparent", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 16 }}
+                title="Trimite mesaj"
+              >
+                💬
+              </button>
+            </div>
           </div>
         )}
 
@@ -254,6 +272,44 @@ export default function ProfilePage() {
         </div>
       ) : (
         posts.map(p => <PostCard key={p._id} post={p} onDelete={handleDeletePost} />)
+      )}
+
+      {/* Modal urmăritori / urmăriți */}
+      {showFollowModal && (
+        <div
+          onClick={() => setShowFollowModal(null)}
+          style={{ position: "fixed", inset: 0, background: "#000000bb", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 14, width: "100%", maxWidth: 360, maxHeight: "70vh", display: "flex", flexDirection: "column" }}>
+            <div style={{ padding: "14px 16px", fontWeight: 700, fontSize: 15, borderBottom: "1px solid #222", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              {showFollowModal === "followers" ? "Urmăritori" : "Urmăriți"}
+              <span onClick={() => setShowFollowModal(null)} style={{ cursor: "pointer", color: "#555", fontSize: 18 }}>✕</span>
+            </div>
+            <div style={{ overflowY: "auto", flex: 1 }}>
+              {(showFollowModal === "followers" ? profile.followers : profile.following)?.length === 0 && (
+                <div style={{ padding: "2rem", textAlign: "center", color: "#555", fontSize: 13 }}>Nimeni încă</div>
+              )}
+              {(showFollowModal === "followers" ? profile.followers : profile.following)?.map(u => {
+                const uid = u._id || u;
+                const uname = u.username || "...";
+                const udisplay = u.displayName || uname;
+                return (
+                  <div
+                    key={uid}
+                    onClick={() => { setShowFollowModal(null); navigate(`/profile/${uid}`); }}
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", cursor: "pointer", borderBottom: "1px solid #111" }}
+                  >
+                    <Avatar user={u} size={38} />
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{udisplay}</div>
+                      <div style={{ fontSize: 11, color: "#555" }}>@{uname}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
