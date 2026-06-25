@@ -1,6 +1,13 @@
 const router = require("express").Router();
 const User = require("../models/User");
 const { auth } = require("../middleware/auth");
+const cloudinary = require("cloudinary").v2;
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 // Caută useri
 router.get("/search", auth, async (req, res) => {
@@ -67,19 +74,34 @@ router.put("/:id/follow", auth, async (req, res) => {
   }
 });
 
-// Update profil
+// Update profil (cu avatar opțional)
 router.put("/me/update", auth, async (req, res) => {
   try {
-    const { displayName, bio, location, role } = req.body;
+    const { displayName, bio, location, role, avatarBase64 } = req.body;
     const allowed = ["Civil", "Politie", "Mecanic", "Pompier", "Medic"];
     const update = {};
     if (displayName) update.displayName = displayName;
     if (bio !== undefined) update.bio = bio;
-    if (location) update.location = location;
+    if (location !== undefined) update.location = location;
     if (role && allowed.includes(role)) update.role = role;
+
+    // Upload avatar pe Cloudinary dacă e trimis
+    if (avatarBase64) {
+      const result = await cloudinary.uploader.upload(avatarBase64, {
+        folder: "tropical-rp/avatars",
+        transformation: [
+          { width: 300, height: 300, crop: "fill", gravity: "face" },
+          { quality: "auto" },
+          { fetch_format: "auto" },
+        ],
+      });
+      update.avatar = result.secure_url;
+    }
+
     const user = await User.findByIdAndUpdate(req.user._id, update, { new: true }).select("-password");
     res.json(user);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Eroare" });
   }
 });
