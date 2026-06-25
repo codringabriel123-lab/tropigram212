@@ -174,12 +174,17 @@ export default function MessagesPage() {
 
             <div style={s.messages}>
               {loadingMsgs && <div style={{ textAlign: "center", color: "#444", fontSize: 12 }}>Se încarcă...</div>}
-              {messages.map(msg => {
+              {messages.map((msg, idx) => {
                 const mine = msg.sender?._id === me?._id || msg.sender === me?._id;
+                const isLast = idx === messages.length - 1;
+                const showSeen = mine && isLast && msg.read && msg.seenAt;
                 return (
                   <div key={msg._id} style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start", gap: 2 }}>
                     <div style={s.bubble(mine)}>{msg.text}</div>
-                    <span style={{ fontSize: 10, color: "#444" }}>{timeAgo(msg.createdAt)}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ fontSize: 10, color: "#444" }}>{timeAgo(msg.createdAt)}</span>
+                      {showSeen && <span style={{ fontSize: 10, color: "#e91e8c" }}>· Văzut</span>}
+                    </div>
                   </div>
                 );
               })}

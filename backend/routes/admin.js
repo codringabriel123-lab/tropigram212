@@ -3,6 +3,7 @@ const User = require("../models/User");
 const Post = require("../models/Post");
 const Notification = require("../models/Notification");
 const AuditLog = require("../models/AuditLog");
+const CustomRole = require("../models/CustomRole");
 const { adminAuth } = require("../middleware/auth");
 
 // Durate presetate pentru ban/mute (în milisecunde). "permanent" => null (fără expirare)
@@ -278,6 +279,94 @@ router.put("/users/:id/toggle-verify", adminAuth, async (req, res) => {
     });
 
     res.json({ message: `${user.username} este acum ${user.isVerified ? "verificat ✓" : "neverificat"}`, user });
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
+// ── ROLURI CUSTOM ──────────────────────────────────────────
+
+// Lista toate rolurile custom
+router.get("/roles", adminAuth, async (req, res) => {
+  try {
+    const roles = await CustomRole.find().sort({ createdAt: -1 }).populate("createdBy", "username");
+    res.json(roles);
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
+// Creează rol custom
+router.post("/roles", adminAuth, async (req, res) => {
+  try {
+    const { name, color } = req.body;
+    if (!name?.trim()) return res.status(400).json({ message: "Numele rolului e obligatoriu" });
+    const exists = await CustomRole.findOne({ name: name.trim() });
+    if (exists) return res.status(400).json({ message: "Există deja un rol cu acest nume" });
+    const role = await CustomRole.create({ name: name.trim(), color: color || "#888888", createdBy: req.user._id });
+    await logAction({ adminId: req.user._id, action: "create-role", details: `Rol creat: ${role.name}` });
+    res.status(201).json(role);
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
+// Editează rol custom (nume + culoare)
+router.put("/roles/:id", adminAuth, async (req, res) => {
+  try {
+    const { name, color } = req.body;
+    const role = await CustomRole.findById(req.params.id);
+    if (!role) return res.status(404).json({ message: "Rol negăsit" });
+    if (name?.trim()) role.name = name.trim();
+    if (color) role.color = color;
+    await role.save();
+    await logAction({ adminId: req.user._id, action: "edit-role", details: `Rol editat: ${role.name}` });
+    res.json(role);
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
+// Șterge rol custom
+router.delete("/roles/:id", adminAuth, async (req, res) => {
+  try {
+    const role = await CustomRole.findById(req.params.id);
+    if (!role) return res.status(404).json({ message: "Rol negăsit" });
+    // Resetează userii care aveau acest rol custom
+    await User.updateMany({ customRole: role._id }, { customRole: null });
+    await role.deleteOne();
+    await logAction({ adminId: req.user._id, action: "delete-role", details: `Rol șters: ${role.name}` });
+    res.json({ message: "Rol șters" });
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
+// Atribuie rol unui user (customRole sau role standard)
+router.put("/users/:id/role", adminAuth, async (req, res) => {
+  try {
+    const { customRoleId, standardRole } = req.body;
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User negăsit" });
+
+    if (customRoleId) {
+      const role = await CustomRole.findById(customRoleId);
+      if (!role) return res.status(404).json({ message: "Rol negăsit" });
+      user.customRole = role._id;
+      user.role = role.name;
+      await user.save();
+      await logAction({ adminId: req.user._id, action: "assign-role", targetUser: user._id, details: `Rol atribuit: ${role.name}` });
+    } else if (standardRole) {
+      user.customRole = null;
+      user.role = standardRole;
+      await user.save();
+      await logAction({ adminId: req.user._id, action: "assign-role", targetUser: user._id, details: `Rol standard atribuit: ${standardRole}` });
+    } else {
+      return res.status(400).json({ message: "Trimite customRoleId sau standardRole" });
+    }
+
+    await user.populate("customRole");
+    res.json(user);
   } catch (err) {
     res.status(500).json({ message: "Eroare" });
   }

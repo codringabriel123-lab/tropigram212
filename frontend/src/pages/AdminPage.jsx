@@ -78,7 +78,13 @@ export default function AdminPage() {
   const [tab, setTab] = useState("stats");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(null); // { type: "ban" | "mute", userId, username }
+  const [modal, setModal] = useState(null);
+  // Roluri custom
+  const [roles, setRoles] = useState([]);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [newRoleColor, setNewRoleColor] = useState("#e91e8c");
+  const [editingRole, setEditingRole] = useState(null); // { _id, name, color }
+  const [roleModal, setRoleModal] = useState(null); // { userId, username } pentru atribuire rol
 
   useEffect(() => {
     api.get("/admin/stats").then(r => setStats(r.data)).finally(() => setLoading(false));
@@ -90,6 +96,9 @@ export default function AdminPage() {
     }
     if (tab === "audit") {
       api.get("/admin/audit-log").then(r => setLogs(r.data.logs));
+    }
+    if (tab === "roles") {
+      api.get("/admin/roles").then(r => setRoles(r.data));
     }
   }, [tab, search]);
 
@@ -161,6 +170,7 @@ export default function AdminPage() {
         {[
           { key: "stats", label: "📊 Statistici" },
           { key: "users", label: "👥 Useri" },
+          { key: "roles", label: "🎭 Roluri" },
           { key: "audit", label: "📜 Audit Log" },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
@@ -224,7 +234,7 @@ export default function AdminPage() {
                     {u.isBanned && <span style={{ marginLeft: 6, fontSize: 10, color: "#e74c3c" }}>🚫 BANAT</span>}
                     {u.isMuted && <span style={{ marginLeft: 6, fontSize: 10, color: "#f39c12" }}>🔇 MUTE</span>}
                   </div>
-                  <div style={{ fontSize: 12, color: "#666" }}>{u.role} • {new Date(u.createdAt).toLocaleDateString("ro-RO")}</div>
+                  <div style={{ fontSize: 12, color: u.customRole?.color || "#666" }}>{u.role} • {new Date(u.createdAt).toLocaleDateString("ro-RO")}</div>
                   {u.isBanned && (
                     <div style={{ fontSize: 11, color: "#e74c3c", marginTop: 2 }}>
                       Ban: {u.banReason || "—"} {u.banExpiresAt ? `(expiră ${new Date(u.banExpiresAt).toLocaleString("ro-RO")})` : "(permanent)"}
@@ -267,6 +277,11 @@ export default function AdminPage() {
                   {u.isAdmin ? "Retrogradează" : "👑 Promovează"}
                 </button>
 
+                <button onClick={() => { api.get("/admin/roles").then(r => setRoles(r.data)); setRoleModal({ userId: u._id, username: u.username }); }}
+                  style={{ flex: "1 1 100%", padding: "7px", borderRadius: 8, border: "1px solid #f5a623", background: "transparent", color: "#f5a623", fontWeight: 600, cursor: "pointer", fontSize: 12 }}>
+                  🎭 Schimbă rol
+                </button>
+
                 <button onClick={() => handleToggleVerify(u._id, u.username, u.isVerified)}
                   style={{ flex: "1 1 100%", padding: "7px", borderRadius: 8, border: `1px solid ${u.isVerified ? "#888" : "#1da1f2"}`, background: "transparent", color: u.isVerified ? "#888" : "#1da1f2", fontWeight: 600, cursor: "pointer", fontSize: 12 }}>
                   {u.isVerified ? "❌ Elimină verificarea" : "✓ Verifică contul"}
@@ -304,6 +319,123 @@ export default function AdminPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {tab === "roles" && (
+        <div>
+          {/* Creare rol nou */}
+          <div style={{ background: "#1a1a1a", borderRadius: 12, padding: 16, marginBottom: 20, border: "1px solid #2a2a2a" }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>🎭 Crează rol nou</div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <input
+                placeholder="Nume rol (ex: Politician, Sheriff...)"
+                value={newRoleName}
+                onChange={e => setNewRoleName(e.target.value)}
+                style={{ flex: 1, minWidth: 160, background: "#111", border: "1px solid #333", borderRadius: 8, padding: "8px 12px", color: "#fff", fontSize: 13 }}
+              />
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, color: "#666" }}>Culoare:</span>
+                <input
+                  type="color"
+                  value={newRoleColor}
+                  onChange={e => setNewRoleColor(e.target.value)}
+                  style={{ width: 36, height: 36, border: "none", borderRadius: 6, cursor: "pointer", background: "transparent" }}
+                />
+                <span style={{ fontSize: 12, fontWeight: 700, color: newRoleColor }}>{newRoleName || "Preview"}</span>
+              </div>
+              <button
+                onClick={async () => {
+                  if (!newRoleName.trim()) return;
+                  try {
+                    const r = await api.post("/admin/roles", { name: newRoleName.trim(), color: newRoleColor });
+                    setRoles(prev => [r.data, ...prev]);
+                    setNewRoleName(""); setNewRoleColor("#e91e8c");
+                  } catch (err) { alert(err.response?.data?.message || "Eroare"); }
+                }}
+                style={{ padding: "8px 16px", borderRadius: 8, background: "#e91e8c", border: "none", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13 }}
+              >Crează</button>
+            </div>
+          </div>
+
+          {/* Lista roluri */}
+          {roles.length === 0 && <div style={{ color: "#555", textAlign: "center", padding: "2rem" }}>Niciun rol custom încă</div>}
+          {roles.map(role => (
+            <div key={role._id} style={{ background: "#1a1a1a", borderRadius: 10, padding: "12px 16px", marginBottom: 8, border: "1px solid #2a2a2a", display: "flex", alignItems: "center", gap: 12 }}>
+              {editingRole?._id === role._id ? (
+                <>
+                  <input value={editingRole.name} onChange={e => setEditingRole(p => ({ ...p, name: e.target.value }))}
+                    style={{ flex: 1, background: "#111", border: "1px solid #333", borderRadius: 6, padding: "6px 10px", color: "#fff", fontSize: 13 }} />
+                  <input type="color" value={editingRole.color} onChange={e => setEditingRole(p => ({ ...p, color: e.target.value }))}
+                    style={{ width: 32, height: 32, border: "none", borderRadius: 4, cursor: "pointer", background: "transparent" }} />
+                  <button onClick={async () => {
+                    try {
+                      const r = await api.put(`/admin/roles/${role._id}`, { name: editingRole.name, color: editingRole.color });
+                      setRoles(prev => prev.map(ro => ro._id === role._id ? r.data : ro));
+                      setEditingRole(null);
+                    } catch (err) { alert(err.response?.data?.message || "Eroare"); }
+                  }} style={{ padding: "5px 12px", borderRadius: 6, background: "#2ecc71", border: "none", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 12 }}>Salvează</button>
+                  <button onClick={() => setEditingRole(null)} style={{ padding: "5px 10px", borderRadius: 6, background: "#333", border: "none", color: "#aaa", cursor: "pointer", fontSize: 12 }}>✕</button>
+                </>
+              ) : (
+                <>
+                  <span style={{ width: 14, height: 14, borderRadius: "50%", background: role.color, flexShrink: 0, display: "inline-block" }} />
+                  <span style={{ fontWeight: 700, fontSize: 14, color: role.color, flex: 1 }}>{role.name}</span>
+                  <span style={{ fontSize: 11, color: "#555" }}>de {role.createdBy?.username || "sistem"}</span>
+                  <button onClick={() => setEditingRole({ _id: role._id, name: role.name, color: role.color })}
+                    style={{ padding: "5px 10px", borderRadius: 6, background: "#333", border: "none", color: "#aaa", cursor: "pointer", fontSize: 12 }}>✏️</button>
+                  <button onClick={async () => {
+                    if (!window.confirm(`Ștergi rolul "${role.name}"? Toți userii cu acest rol vor fi resetați.`)) return;
+                    try {
+                      await api.delete(`/admin/roles/${role._id}`);
+                      setRoles(prev => prev.filter(r => r._id !== role._id));
+                    } catch (err) { alert(err.response?.data?.message || "Eroare"); }
+                  }} style={{ padding: "5px 10px", borderRadius: 6, background: "#2a1010", border: "1px solid #5a2020", color: "#e74c3c", cursor: "pointer", fontSize: 12 }}>🗑️</button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal atribuire rol user */}
+      {roleModal && (
+        <div onClick={() => setRoleModal(null)} style={{ position: "fixed", inset: 0, background: "#000000bb", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 14, width: "100%", maxWidth: 340, padding: 20 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16 }}>🎭 Atribuie rol pentru <span style={{ color: "#e91e8c" }}>@{roleModal.username}</span></div>
+
+            <div style={{ fontWeight: 600, fontSize: 12, color: "#666", marginBottom: 8 }}>ROLURI STANDARD</div>
+            {["Civil", "Politie", "Mecanic", "Pompier", "Medic"].map(sr => (
+              <button key={sr} onClick={async () => {
+                try {
+                  const r = await api.put(`/admin/users/${roleModal.userId}/role`, { standardRole: sr });
+                  setUsers(prev => prev.map(u => u._id === roleModal.userId ? r.data : u));
+                  setRoleModal(null);
+                } catch (err) { alert(err.response?.data?.message || "Eroare"); }
+              }} style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", marginBottom: 4, background: "#111", border: "1px solid #2a2a2a", borderRadius: 8, color: "#ccc", cursor: "pointer", fontSize: 13 }}>
+                {sr}
+              </button>
+            ))}
+
+            {roles.length > 0 && (
+              <>
+                <div style={{ fontWeight: 600, fontSize: 12, color: "#666", margin: "12px 0 8px" }}>ROLURI CUSTOM</div>
+                {roles.map(role => (
+                  <button key={role._id} onClick={async () => {
+                    try {
+                      const r = await api.put(`/admin/users/${roleModal.userId}/role`, { customRoleId: role._id });
+                      setUsers(prev => prev.map(u => u._id === roleModal.userId ? r.data : u));
+                      setRoleModal(null);
+                    } catch (err) { alert(err.response?.data?.message || "Eroare"); }
+                  }} style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", marginBottom: 4, background: "#111", border: `1px solid ${role.color}44`, borderRadius: 8, color: role.color, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
+                    {role.name}
+                  </button>
+                ))}
+              </>
+            )}
+
+            <button onClick={() => setRoleModal(null)} style={{ marginTop: 12, width: "100%", padding: "8px", borderRadius: 8, background: "#222", border: "1px solid #333", color: "#888", cursor: "pointer" }}>Anulează</button>
+          </div>
         </div>
       )}
 

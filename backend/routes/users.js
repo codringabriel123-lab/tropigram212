@@ -42,7 +42,8 @@ router.get("/:id", auth, async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-password")
       .populate("followers", "username displayName avatar")
-      .populate("following", "username displayName avatar");
+      .populate("following", "username displayName avatar")
+      .populate("customRole");
     if (!user) return res.status(404).json({ message: "User negăsit" });
     res.json(user);
   } catch (err) {

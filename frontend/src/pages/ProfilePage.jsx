@@ -4,8 +4,8 @@ import { useAuth } from "../context/AuthContext";
 import api from "../api";
 import Avatar from "../components/Avatar";
 import PostCard from "../components/PostCard";
+import { getRoleColor, getRoleName } from "../utils/roleUtils";
 
-const ROLE_COLORS = { Civil: "#888", Politie: "#4a90e2", Mecanic: "#f5a623", Pompier: "#e74c3c", Medic: "#2ecc71", Admin: "#e91e8c" };
 const ROLES = ["Civil", "Politie", "Mecanic", "Pompier", "Medic"];
 
 export default function ProfilePage() {
@@ -140,8 +140,8 @@ export default function ProfilePage() {
               {profile.isVerified && <span style={{ color: "#1da1f2", fontSize: 16 }} title="Cont verificat">✓</span>}
             </div>
             <div style={{ fontSize: 13, color: "#666", marginBottom: 4 }}>@{profile.username}</div>
-            <span style={{ fontSize: 11, color: ROLE_COLORS[profile.role] || "#888", background: "#111", padding: "3px 10px", borderRadius: 20, border: `1px solid ${ROLE_COLORS[profile.role] || "#333"}` }}>
-              {profile.role}
+            <span style={{ fontSize: 11, color: getRoleColor(profile), background: "#111", padding: "3px 10px", borderRadius: 20, border: `1px solid ${getRoleColor(profile)}` }}>
+              {getRoleName(profile)}
             </span>
           </div>
         </div>

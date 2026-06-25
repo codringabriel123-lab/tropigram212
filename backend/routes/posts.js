@@ -34,7 +34,7 @@ router.get("/feed", auth, async (req, res) => {
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(Number(limit))
-      .populate("author", "username displayName avatar role location")
+      .populate("author", "username displayName avatar role location customRole")
       .populate("comments.author", "username displayName avatar");
     res.json(posts);
   } catch (err) {
@@ -50,7 +50,7 @@ router.get("/explore", auth, async (req, res) => {
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(Number(limit))
-      .populate("author", "username displayName avatar role location")
+      .populate("author", "username displayName avatar role location customRole")
       .populate("comments.author", "username displayName avatar");
     res.json(posts);
   } catch (err) {
@@ -63,7 +63,7 @@ router.get("/user/:userId", auth, async (req, res) => {
   try {
     const posts = await Post.find({ author: req.params.userId, isDeleted: false })
       .sort({ createdAt: -1 })
-      .populate("author", "username displayName avatar role")
+      .populate("author", "username displayName avatar role customRole")
       .populate("comments.author", "username displayName avatar");
     res.json(posts);
   } catch (err) {
@@ -94,7 +94,7 @@ router.post("/", auth, muteCheck, async (req, res) => {
       ...(song ? { song } : {}),
     });
     await post.save();
-    await post.populate("author", "username displayName avatar role location");
+    await post.populate("author", "username displayName avatar role location customRole");
     res.status(201).json(post);
   } catch (err) {
     res.status(500).json({ message: "Eroare la postare" });

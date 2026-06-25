@@ -52,10 +52,10 @@ router.get("/conversations/:convId/messages", auth, async (req, res) => {
       .sort({ createdAt: 1 })
       .populate("sender", "username displayName avatar");
 
-    // Marchează mesajele primite ca citite
+    // Marchează mesajele primite ca citite + seenAt
     await Message.updateMany(
       { conversation: req.params.convId, sender: { $ne: req.user._id }, read: false },
-      { read: true }
+      { read: true, seenAt: new Date() }
     );
 
     res.json(messages);
