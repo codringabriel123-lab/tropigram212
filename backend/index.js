@@ -12,6 +12,7 @@ const adminRoutes = require("./routes/admin");
 const uploadRoutes = require("./routes/upload");
 const eventRoutes = require("./routes/events");
 const messageRoutes = require("./routes/messages");
+const mafiaRoutes = require("./routes/mafia");
 
 const app = express();
 
@@ -32,23 +33,8 @@ app.use(cors({
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 
-// Limita stricta doar pe login/register (anti-brute force)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  message: { message: "Prea multe încercări, încearcă din nou mai târziu" }
-});
-
-// Limita generoasa pentru restul API-ului
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 1000,
-  message: { message: "Prea multe requesturi" }
-});
-
-app.use("/api/auth/login", authLimiter);
-app.use("/api/auth/register", authLimiter);
-app.use("/api", apiLimiter);
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
+app.use(limiter);
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB conectat"))
@@ -62,6 +48,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/mafia", mafiaRoutes);
 
 app.get("/api/health", (req, res) => res.json({ status: "ok", time: new Date() }));
 

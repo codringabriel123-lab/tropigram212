@@ -20,8 +20,23 @@ router.get("/search", auth, async (req, res) => {
         { displayName: { $regex: q, $options: "i" } },
       ],
       isBanned: false,
-    }).select("-password").limit(10);
-    res.json(users);
+    }).select("-password").populate("customRole").limit(10);
+
+    // Verifică dacă viewer-ul e admin sau mafia
+    const viewer = await User.findById(req.user._id).populate("customRole");
+    const viewerCanSeeMafia = viewer?.isAdmin || viewer?.customRole?.isMafia;
+
+    const result = users.map(u => {
+      const obj = u.toObject();
+      if (!viewerCanSeeMafia && obj.customRole?.isMafia) {
+        // Maschează rolul — apare ca Civil
+        obj.role = "Civil";
+        obj.customRole = null;
+      }
+      return obj;
+    });
+
+    res.json(result);
   } catch (err) {
     res.status(500).json({ message: "Eroare" });
   }
@@ -30,8 +45,19 @@ router.get("/search", auth, async (req, res) => {
 // Toți membrii
 router.get("/", auth, async (req, res) => {
   try {
-    const users = await User.find({ isBanned: false }).select("-password").sort({ createdAt: -1 });
-    res.json(users);
+    const users = await User.find({ isBanned: false }).select("-password").populate("customRole").sort({ createdAt: -1 });
+    const viewer = await User.findById(req.user._id).populate("customRole");
+    const viewerCanSeeMafia = viewer?.isAdmin || viewer?.customRole?.isMafia;
+
+    const result = users.map(u => {
+      const obj = u.toObject();
+      if (!viewerCanSeeMafia && obj.customRole?.isMafia) {
+        obj.role = "Civil";
+        obj.customRole = null;
+      }
+      return obj;
+    });
+    res.json(result);
   } catch (err) {
     res.status(500).json({ message: "Eroare" });
   }
@@ -45,7 +71,16 @@ router.get("/:id", auth, async (req, res) => {
       .populate("following", "username displayName avatar")
       .populate("customRole");
     if (!user) return res.status(404).json({ message: "User negăsit" });
-    res.json(user);
+
+    const viewer = await User.findById(req.user._id).populate("customRole");
+    const viewerCanSeeMafia = viewer?.isAdmin || viewer?.customRole?.isMafia;
+
+    const obj = user.toObject();
+    if (!viewerCanSeeMafia && obj.customRole?.isMafia) {
+      obj.role = "Civil";
+      obj.customRole = null;
+    }
+    res.json(obj);
   } catch (err) {
     res.status(500).json({ message: "Eroare" });
   }

@@ -83,6 +83,7 @@ export default function AdminPage() {
   const [roles, setRoles] = useState([]);
   const [newRoleName, setNewRoleName] = useState("");
   const [newRoleColor, setNewRoleColor] = useState("#e91e8c");
+  const [newRoleIsMafia, setNewRoleIsMafia] = useState(false);
   const [editingRole, setEditingRole] = useState(null); // { _id, name, color }
   const [roleModal, setRoleModal] = useState(null); // { userId, username } pentru atribuire rol
 
@@ -344,11 +345,20 @@ export default function AdminPage() {
                 />
                 <span style={{ fontSize: 12, fontWeight: 700, color: newRoleColor }}>{newRoleName || "Preview"}</span>
               </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: newRoleIsMafia ? "#cc0000" : "#666" }}>
+                <input
+                  type="checkbox"
+                  checked={newRoleIsMafia}
+                  onChange={e => setNewRoleIsMafia(e.target.checked)}
+                  style={{ accentColor: "#cc0000" }}
+                />
+                🔴 Rol Secret (Mafie)
+              </label>
               <button
                 onClick={async () => {
                   if (!newRoleName.trim()) return;
                   try {
-                    const r = await api.post("/admin/roles", { name: newRoleName.trim(), color: newRoleColor });
+                    const r = await api.post("/admin/roles", { name: newRoleName.trim(), color: newRoleColor, isMafia: newRoleIsMafia });
                     setRoles(prev => [r.data, ...prev]);
                     setNewRoleName(""); setNewRoleColor("#e91e8c");
                   } catch (err) { alert(err.response?.data?.message || "Eroare"); }
@@ -380,7 +390,7 @@ export default function AdminPage() {
               ) : (
                 <>
                   <span style={{ width: 14, height: 14, borderRadius: "50%", background: role.color, flexShrink: 0, display: "inline-block" }} />
-                  <span style={{ fontWeight: 700, fontSize: 14, color: role.color, flex: 1 }}>{role.name}</span>
+                  <span style={{ fontWeight: 700, fontSize: 14, color: role.color, flex: 1 }}>{role.name}{role.isMafia ? " 🔴" : ""}</span>
                   <span style={{ fontSize: 11, color: "#555" }}>de {role.createdBy?.username || "sistem"}</span>
                   <button onClick={() => setEditingRole({ _id: role._id, name: role.name, color: role.color })}
                     style={{ padding: "5px 10px", borderRadius: 6, background: "#333", border: "none", color: "#aaa", cursor: "pointer", fontSize: 12 }}>✏️</button>

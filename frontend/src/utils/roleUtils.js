@@ -17,3 +17,14 @@ export function getRoleColor(user) {
 export function getRoleName(user) {
   return user?.role || "Civil";
 }
+
+// Verifică dacă un user curent poate vedea rolurile secrete (mafia)
+// Backend-ul maschează deja datele, dar această funcție e utilă pentru logică UI
+export function isMafiaUser(user) {
+  return user?.customRole?.isMafia === true;
+}
+
+// Folosit în admin — returnează badge "🔴 MAFIA" dacă rolul e secret
+export function getMafiaBadge(user) {
+  return user?.customRole?.isMafia ? "🔴" : "";
+}

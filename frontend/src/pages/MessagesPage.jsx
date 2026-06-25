@@ -17,6 +17,11 @@ export default function MessagesPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  // Tab: "dm" | "mafia"
+  const [activeTab, setActiveTab] = useState("dm");
+  const [hasMafiaAccess, setHasMafiaAccess] = useState(false);
+
+  // DM state
   const [conversations, setConversations] = useState([]);
   const [activeConv, setActiveConv] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -24,10 +29,26 @@ export default function MessagesPage() {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
-  const bottomRef = useRef();
-  const pollRef = useRef();
 
-  // Încarcă conversațiile
+  // Mafia chat state
+  const [mafiaMessages, setMafiaMessages] = useState([]);
+  const [mafiaText, setMafiaText] = useState("");
+  const [mafiaSending, setMafiaSending] = useState(false);
+  const [mafiaLoading, setMafiaLoading] = useState(false);
+
+  const bottomRef = useRef();
+  const mafiaBottomRef = useRef();
+  const pollRef = useRef();
+  const mafiaPollRef = useRef();
+
+  // Verifică accesul la mafia chat
+  useEffect(() => {
+    api.get("/mafia/check")
+      .then(() => setHasMafiaAccess(true))
+      .catch(() => setHasMafiaAccess(false));
+  }, []);
+
+  // Încarcă conversațiile DM
   const fetchConversations = async () => {
     try {
       const res = await api.get("/messages/conversations");
@@ -40,7 +61,7 @@ export default function MessagesPage() {
     fetchConversations().finally(() => setLoading(false));
   }, []);
 
-  // Dacă vine cu ?with=userId, deschide/creează conversația direct
+  // Dacă vine cu ?with=userId
   useEffect(() => {
     const withUserId = searchParams.get("with");
     if (withUserId) {
@@ -57,12 +78,10 @@ export default function MessagesPage() {
     try {
       const res = await api.get(`/messages/conversations/${conv._id}/messages`);
       setMessages(res.data);
-      // Actualizează conversațiile (badge-uri citite)
       fetchConversations();
     } catch {}
     setLoadingMsgs(false);
 
-    // Polling la 3s pentru mesaje noi
     pollRef.current = setInterval(async () => {
       try {
         const res = await api.get(`/messages/conversations/${conv._id}/messages`);
@@ -71,12 +90,46 @@ export default function MessagesPage() {
     }, 3000);
   };
 
+  // Mafia chat
+  const fetchMafiaMessages = async () => {
+    try {
+      const res = await api.get("/mafia/messages");
+      setMafiaMessages(res.data);
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (activeTab === "mafia" && hasMafiaAccess) {
+      setMafiaLoading(true);
+      fetchMafiaMessages().finally(() => setMafiaLoading(false));
+      mafiaPollRef.current = setInterval(fetchMafiaMessages, 3000);
+    } else {
+      clearInterval(mafiaPollRef.current);
+    }
+    return () => clearInterval(mafiaPollRef.current);
+  }, [activeTab, hasMafiaAccess]);
+
+  const sendMafiaMessage = async () => {
+    if (!mafiaText.trim() || mafiaSending) return;
+    setMafiaSending(true);
+    try {
+      const res = await api.post("/mafia/messages", { text: mafiaText.trim() });
+      setMafiaMessages(prev => [...prev, res.data]);
+      setMafiaText("");
+    } catch {}
+    setMafiaSending(false);
+  };
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   useEffect(() => {
-    return () => clearInterval(pollRef.current);
+    mafiaBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [mafiaMessages]);
+
+  useEffect(() => {
+    return () => { clearInterval(pollRef.current); clearInterval(mafiaPollRef.current); };
   }, []);
 
   const sendMessage = async () => {
@@ -94,7 +147,15 @@ export default function MessagesPage() {
   const getOther = (conv) => conv.participants?.find(p => p._id !== me?._id);
 
   const s = {
-    page: { display: "flex", height: "calc(100vh - 120px)", background: "#0d0d0d" },
+    page: { display: "flex", flexDirection: "column", height: "calc(100vh - 120px)", background: "#0d0d0d" },
+    tabs: { display: "flex", borderBottom: "1px solid #1f1f1f", flexShrink: 0 },
+    tab: (active, mafia) => ({
+      flex: 1, padding: "11px 0", textAlign: "center", cursor: "pointer", fontSize: 13, fontWeight: active ? 700 : 400,
+      color: active ? (mafia ? "#cc0000" : "#e91e8c") : "#555",
+      borderBottom: active ? `2px solid ${mafia ? "#cc0000" : "#e91e8c"}` : "2px solid transparent",
+      background: "transparent", border: "none", transition: "color 0.15s",
+    }),
+    body: { flex: 1, display: "flex", overflow: "hidden" },
     sidebar: { width: 260, borderRight: "1px solid #1f1f1f", display: "flex", flexDirection: "column", flexShrink: 0 },
     sideHeader: { padding: "14px 16px", fontWeight: 700, fontSize: 15, borderBottom: "1px solid #1f1f1f" },
     convItem: (active) => ({
@@ -110,101 +171,170 @@ export default function MessagesPage() {
       background: mine ? "#e91e8c" : "#1f1f1f", color: "#fff", fontSize: 13, lineHeight: 1.5,
       alignSelf: mine ? "flex-end" : "flex-start",
     }),
+    mafiaBubble: (mine) => ({
+      maxWidth: "70%", padding: "8px 12px", borderRadius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+      background: mine ? "#8b0000" : "#1a0000", color: "#ffcccc", fontSize: 13, lineHeight: 1.5,
+      alignSelf: mine ? "flex-end" : "flex-start",
+      border: mine ? "1px solid #cc0000" : "1px solid #440000",
+    }),
     inputRow: { display: "flex", gap: 8, padding: "12px 16px", borderTop: "1px solid #1f1f1f", alignItems: "center" },
     input: { flex: 1, background: "#1a1a1a", border: "1px solid #333", borderRadius: 20, padding: "8px 14px", color: "#fff", fontSize: 13, outline: "none" },
-    sendBtn: (ok) => ({ background: ok ? "#e91e8c" : "#333", border: "none", borderRadius: "50%", width: 36, height: 36, color: "#fff", fontSize: 18, cursor: ok ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }),
+    mafiaInput: { flex: 1, background: "#1a0000", border: "1px solid #550000", borderRadius: 20, padding: "8px 14px", color: "#ffcccc", fontSize: 13, outline: "none" },
+    sendBtn: (ok, mafia) => ({ background: ok ? (mafia ? "#8b0000" : "#e91e8c") : "#333", border: "none", borderRadius: "50%", width: 36, height: 36, color: "#fff", fontSize: 18, cursor: ok ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }),
     empty: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#444", gap: 8 },
+    mafiaHeader: { padding: "12px 16px", borderBottom: "1px solid #330000", display: "flex", alignItems: "center", gap: 8, background: "#0d0000" },
+    senderName: { fontSize: 10, color: "#888", marginBottom: 2 },
+    mafiaSenderName: { fontSize: 10, color: "#cc4444", marginBottom: 2 },
   };
 
   return (
     <div style={s.page}>
-      {/* Sidebar conversații */}
-      <div style={s.sidebar}>
-        <div style={s.sideHeader}>💬 Mesaje</div>
-        {loading && <div style={{ padding: "2rem", textAlign: "center", color: "#444" }}>Se încarcă...</div>}
-        {!loading && conversations.length === 0 && (
-          <div style={{ padding: "2rem", textAlign: "center", color: "#444", fontSize: 13 }}>
-            Nicio conversație încă.<br />
-            <span style={{ color: "#e91e8c", cursor: "pointer" }} onClick={() => navigate("/members")}>Găsește membri →</span>
-          </div>
+      {/* Tab-uri */}
+      <div style={s.tabs}>
+        <button style={s.tab(activeTab === "dm", false)} onClick={() => setActiveTab("dm")}>
+          💬 Mesaje Directe
+        </button>
+        {hasMafiaAccess && (
+          <button style={s.tab(activeTab === "mafia", true)} onClick={() => setActiveTab("mafia")}>
+            🔴 Chat Mafie
+          </button>
         )}
-        {conversations.map(conv => {
-          const other = getOther(conv);
-          const isActive = activeConv?._id === conv._id;
-          const lastMsg = conv.lastMessage;
-          return (
-            <div key={conv._id} style={s.convItem(isActive)} onClick={() => openConversation(conv)}>
-              <Avatar user={other} size={38} />
-              <div style={{ flex: 1, overflow: "hidden" }}>
-                <div style={{ fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {other?.displayName || other?.username}
-                </div>
-                {lastMsg && (
-                  <div style={{ fontSize: 11, color: "#555", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {lastMsg.sender === me?._id ? "Tu: " : ""}{lastMsg.text}
-                  </div>
-                )}
-              </div>
-              {lastMsg && <div style={{ fontSize: 10, color: "#444", flexShrink: 0 }}>{timeAgo(lastMsg.createdAt)}</div>}
-            </div>
-          );
-        })}
       </div>
 
-      {/* Chat activ */}
-      <div style={s.chat}>
-        {!activeConv ? (
-          <div style={s.empty}>
-            <span style={{ fontSize: 40 }}>💬</span>
-            <span style={{ fontSize: 14 }}>Selectează o conversație</span>
-            <span style={{ fontSize: 12, color: "#e91e8c", cursor: "pointer" }} onClick={() => navigate("/members")}>
-              sau începe una din profilul unui membru →
-            </span>
-          </div>
-        ) : (
+      <div style={s.body}>
+        {/* ─── DM TAB ─── */}
+        {activeTab === "dm" && (
           <>
-            <div style={s.chatHeader}>
-              <div onClick={() => navigate(`/profile/${getOther(activeConv)?._id}`)} style={{ cursor: "pointer" }}>
-                <Avatar user={getOther(activeConv)} size={34} />
-              </div>
-              <span onClick={() => navigate(`/profile/${getOther(activeConv)?._id}`)} style={{ cursor: "pointer" }}>
-                {getOther(activeConv)?.displayName || getOther(activeConv)?.username}
-              </span>
-            </div>
-
-            <div style={s.messages}>
-              {loadingMsgs && <div style={{ textAlign: "center", color: "#444", fontSize: 12 }}>Se încarcă...</div>}
-              {messages.map((msg, idx) => {
-                const mine = msg.sender?._id === me?._id || msg.sender === me?._id;
-                const isLast = idx === messages.length - 1;
-                const showSeen = mine && isLast && msg.read && msg.seenAt;
+            <div style={s.sidebar}>
+              <div style={s.sideHeader}>💬 Mesaje</div>
+              {loading && <div style={{ padding: "2rem", textAlign: "center", color: "#444" }}>Se încarcă...</div>}
+              {!loading && conversations.length === 0 && (
+                <div style={{ padding: "2rem", textAlign: "center", color: "#444", fontSize: 13 }}>
+                  Nicio conversație încă.<br />
+                  <span style={{ color: "#e91e8c", cursor: "pointer" }} onClick={() => navigate("/members")}>Găsește membri →</span>
+                </div>
+              )}
+              {conversations.map(conv => {
+                const other = getOther(conv);
+                const isActive = activeConv?._id === conv._id;
+                const lastMsg = conv.lastMessage;
                 return (
-                  <div key={msg._id} style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start", gap: 2 }}>
-                    <div style={s.bubble(mine)}>{msg.text}</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <span style={{ fontSize: 10, color: "#444" }}>{timeAgo(msg.createdAt)}</span>
-                      {showSeen && <span style={{ fontSize: 10, color: "#e91e8c" }}>· Văzut</span>}
+                  <div key={conv._id} style={s.convItem(isActive)} onClick={() => openConversation(conv)}>
+                    <Avatar user={other} size={38} />
+                    <div style={{ flex: 1, overflow: "hidden" }}>
+                      <div style={{ fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {other?.displayName || other?.username}
+                      </div>
+                      {lastMsg && (
+                        <div style={{ fontSize: 11, color: "#555", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {lastMsg.sender === me?._id ? "Tu: " : ""}{lastMsg.text}
+                        </div>
+                      )}
                     </div>
+                    {lastMsg && <div style={{ fontSize: 10, color: "#444", flexShrink: 0 }}>{timeAgo(lastMsg.createdAt)}</div>}
                   </div>
                 );
               })}
-              <div ref={bottomRef} />
             </div>
 
-            <div style={s.inputRow}>
+            <div style={s.chat}>
+              {!activeConv ? (
+                <div style={s.empty}>
+                  <span style={{ fontSize: 40 }}>💬</span>
+                  <span style={{ fontSize: 14 }}>Selectează o conversație</span>
+                  <span style={{ fontSize: 12, color: "#e91e8c", cursor: "pointer" }} onClick={() => navigate("/members")}>
+                    sau începe una din profilul unui membru →
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <div style={s.chatHeader}>
+                    <div onClick={() => navigate(`/profile/${getOther(activeConv)?._id}`)} style={{ cursor: "pointer" }}>
+                      <Avatar user={getOther(activeConv)} size={34} />
+                    </div>
+                    <span onClick={() => navigate(`/profile/${getOther(activeConv)?._id}`)} style={{ cursor: "pointer" }}>
+                      {getOther(activeConv)?.displayName || getOther(activeConv)?.username}
+                    </span>
+                  </div>
+
+                  <div style={s.messages}>
+                    {loadingMsgs && <div style={{ textAlign: "center", color: "#444", fontSize: 12 }}>Se încarcă...</div>}
+                    {messages.map((msg, idx) => {
+                      const mine = msg.sender?._id === me?._id || msg.sender === me?._id;
+                      const isLast = idx === messages.length - 1;
+                      const showSeen = mine && isLast && msg.read && msg.seenAt;
+                      return (
+                        <div key={msg._id} style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start", gap: 2 }}>
+                          <div style={s.bubble(mine)}>{msg.text}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <span style={{ fontSize: 10, color: "#444" }}>{timeAgo(msg.createdAt)}</span>
+                            {showSeen && <span style={{ fontSize: 10, color: "#e91e8c" }}>· Văzut</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div ref={bottomRef} />
+                  </div>
+
+                  <div style={s.inputRow}>
+                    <input
+                      style={s.input}
+                      placeholder="Scrie un mesaj..."
+                      value={text}
+                      onChange={e => setText(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                      maxLength={1000}
+                    />
+                    <button style={s.sendBtn(text.trim() && !sending, false)} onClick={sendMessage} disabled={!text.trim() || sending}>
+                      ➤
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ─── MAFIA CHAT TAB ─── */}
+        {activeTab === "mafia" && hasMafiaAccess && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "#0a0000" }}>
+            <div style={s.mafiaHeader}>
+              <span style={{ fontSize: 20 }}>🔴</span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "#ff4444" }}>Chat Intern Mafie</div>
+                <div style={{ fontSize: 11, color: "#664444" }}>Criptat • Invizibil pentru poliție</div>
+              </div>
+            </div>
+
+            <div style={{ ...s.messages, background: "#0a0000" }}>
+              {mafiaLoading && <div style={{ textAlign: "center", color: "#440000", fontSize: 12 }}>Se încarcă...</div>}
+              {mafiaMessages.map(msg => {
+                const mine = msg.sender?._id === me?._id || msg.sender === me?._id;
+                return (
+                  <div key={msg._id} style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start", gap: 2 }}>
+                    {!mine && <div style={s.mafiaSenderName}>{msg.sender?.displayName || msg.sender?.username}</div>}
+                    <div style={s.mafiaBubble(mine)}>{msg.text}</div>
+                    <span style={{ fontSize: 10, color: "#442222" }}>{timeAgo(msg.createdAt)}</span>
+                  </div>
+                );
+              })}
+              <div ref={mafiaBottomRef} />
+            </div>
+
+            <div style={{ ...s.inputRow, borderTop: "1px solid #330000", background: "#0d0000" }}>
               <input
-                style={s.input}
-                placeholder="Scrie un mesaj..."
-                value={text}
-                onChange={e => setText(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                style={s.mafiaInput}
+                placeholder="Mesaj intern mafie..."
+                value={mafiaText}
+                onChange={e => setMafiaText(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMafiaMessage()}
                 maxLength={1000}
               />
-              <button style={s.sendBtn(text.trim() && !sending)} onClick={sendMessage} disabled={!text.trim() || sending}>
+              <button style={s.sendBtn(mafiaText.trim() && !mafiaSending, true)} onClick={sendMafiaMessage} disabled={!mafiaText.trim() || mafiaSending}>
                 ➤
               </button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

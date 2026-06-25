@@ -299,11 +299,11 @@ router.get("/roles", adminAuth, async (req, res) => {
 // Creează rol custom
 router.post("/roles", adminAuth, async (req, res) => {
   try {
-    const { name, color } = req.body;
+    const { name, color, isMafia } = req.body;
     if (!name?.trim()) return res.status(400).json({ message: "Numele rolului e obligatoriu" });
     const exists = await CustomRole.findOne({ name: name.trim() });
     if (exists) return res.status(400).json({ message: "Există deja un rol cu acest nume" });
-    const role = await CustomRole.create({ name: name.trim(), color: color || "#888888", createdBy: req.user._id });
+    const role = await CustomRole.create({ name: name.trim(), color: color || "#888888", isMafia: !!isMafia, createdBy: req.user._id });
     await logAction({ adminId: req.user._id, action: "create-role", details: `Rol creat: ${role.name}` });
     res.status(201).json(role);
   } catch (err) {
@@ -314,11 +314,12 @@ router.post("/roles", adminAuth, async (req, res) => {
 // Editează rol custom (nume + culoare)
 router.put("/roles/:id", adminAuth, async (req, res) => {
   try {
-    const { name, color } = req.body;
+    const { name, color, isMafia } = req.body;
     const role = await CustomRole.findById(req.params.id);
     if (!role) return res.status(404).json({ message: "Rol negăsit" });
     if (name?.trim()) role.name = name.trim();
     if (color) role.color = color;
+    if (typeof isMafia === "boolean") role.isMafia = isMafia;
     await role.save();
     await logAction({ adminId: req.user._id, action: "edit-role", details: `Rol editat: ${role.name}` });
     res.json(role);
