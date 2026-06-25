@@ -13,7 +13,8 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    const isAuthCheck = err.config?.url?.includes("/auth/me");
+    if (err.response?.status === 401 && isAuthCheck) {
       localStorage.removeItem("trp_token");
       localStorage.removeItem("trp_user");
       window.location.href = "/auth";
