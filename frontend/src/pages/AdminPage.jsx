@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api";
 import Avatar from "../components/Avatar";
 
@@ -84,6 +85,7 @@ function MiniBarChart({ data }) {
 }
 
 export default function AdminPage() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [duplicateIps, setDuplicateIps] = useState([]);
@@ -250,7 +252,9 @@ export default function AdminPage() {
           <div style={{ background: "#1a1a1a", borderRadius: 12, padding: 16, border: "1px solid #2a2a2a", marginBottom: 10 }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: "#ccc" }}>🆕 Useri recenți</div>
             {stats.recentUsers?.map(u => (
-              <div key={u._id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid #222" }}>
+              <div key={u._id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid #222", cursor: "pointer" }}
+                onClick={() => navigate(`/profile/${u._id}`)}
+                title={`Mergi la profilul lui @${u.username}`}>
                 <Avatar user={u} size={28} />
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>{u.username}</div>
@@ -309,10 +313,16 @@ export default function AdminPage() {
             return (
               <div key={u._id} style={{ background: "#1a1a1a", borderRadius: 12, padding: "12px 14px", marginBottom: 8, border: `1px solid ${isDupIp ? "#f39c1244" : "#2a2a2a"}` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                  <Avatar user={u} size={38} />
+                  <div onClick={() => navigate(`/profile/${u._id}`)} style={{ cursor: "pointer" }} title={`Mergi la profilul lui @${u.username}`}>
+                    <Avatar user={u} size={38} />
+                  </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, fontSize: 14 }}>
-                      {u.username}
+                      <span
+                        onClick={() => navigate(`/profile/${u._id}`)}
+                        style={{ cursor: "pointer", textDecoration: "underline dotted", textUnderlineOffset: 3 }}
+                        title="Deschide profil"
+                      >{u.username}</span>
                       {u.isVerified && <span style={{ marginLeft: 6, fontSize: 10, color: "#1da1f2" }}>✓ VERIFICAT</span>}
                       {u.isAdmin && <span style={{ marginLeft: 6, fontSize: 10, color: "#e91e8c" }}>👑 ADMIN</span>}
                       {u.isBanned && <span style={{ marginLeft: 6, fontSize: 10, color: "#e74c3c" }}>🚫 BANAT</span>}
@@ -527,7 +537,9 @@ export default function AdminPage() {
         <Modal title={`🌐 Conturi cu IP: ${ipModal.ip}`} color="#f39c12" onCancel={() => setIpModal(null)}>
           <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>{ipModal.users.length} cont{ipModal.users.length !== 1 ? "uri" : ""} găsit{ipModal.users.length !== 1 ? "e" : ""}</div>
           {ipModal.users.map(u => (
-            <div key={u._id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid #222" }}>
+            <div key={u._id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid #222", cursor: "pointer" }}
+              onClick={() => { setIpModal(null); navigate(`/profile/${u._id}`); }}
+              title={`Deschide profilul lui @${u.username}`}>
               <Avatar user={u} size={32} />
               <div>
                 <div style={{ fontWeight: 600, fontSize: 13 }}>{u.username} {u.isAdmin && "👑"} {u.isBanned && "🚫"}</div>
