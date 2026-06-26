@@ -8,12 +8,18 @@ export default function PostModal({ onClose, onPost }) {
   const [content, setContent] = useState("");
   const [imagePreview, setImagePreview] = useState(null);
   const [imageBase64, setImageBase64] = useState(null);
+  const [videoPreview, setVideoPreview] = useState(null);
+  const [videoBase64, setVideoBase64] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showSongInput, setShowSongInput] = useState(false);
   const [songUrl, setSongUrl] = useState("");
   const fileInputRef = useRef();
+  const videoInputRef = useRef();
+
+  // Limite video
+  const VIDEO_LIMIT_MB = user?.isVerified ? 200 : 30;
 
   function detectSong(url) {
     if (!url) return null;
@@ -41,6 +47,9 @@ export default function PostModal({ onClose, onPost }) {
       setError("Imaginea e prea mare (max 10MB)");
       return;
     }
+    // Dacă exista video, îl scoatem
+    setVideoPreview(null);
+    setVideoBase64(null);
     const reader = new FileReader();
     reader.onloadend = () => {
       setImagePreview(reader.result);
@@ -55,9 +64,40 @@ export default function PostModal({ onClose, onPost }) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const handleVideoChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > VIDEO_LIMIT_MB) {
+      setError(
+        `Videoul depășește limita de ${VIDEO_LIMIT_MB} MB${
+          !user?.isVerified
+            ? ". Verifică-ți contul pentru a urca videouri de până la 200 MB."
+            : "."
+        }`
+      );
+      return;
+    }
+    // Dacă există imagine, o scoatem
+    setImagePreview(null);
+    setImageBase64(null);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setVideoPreview(URL.createObjectURL(file));
+      setVideoBase64(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeVideo = () => {
+    setVideoPreview(null);
+    setVideoBase64(null);
+    if (videoInputRef.current) videoInputRef.current.value = "";
+  };
+
   const handleSubmit = async () => {
-    if (!content.trim() && !imageBase64) {
-      setError("Adaugă text sau o imagine");
+    if (!content.trim() && !imageBase64 && !videoBase64) {
+      setError("Adaugă text, o imagine sau un video");
       return;
     }
     if (songUrlInvalid) {
@@ -69,8 +109,8 @@ export default function PostModal({ onClose, onPost }) {
 
     try {
       let imageUrl = "";
+      let videoUrl = "";
 
-      // Upload imagine pe Cloudinary dacă există
       if (imageBase64) {
         setUploading(true);
         const uploadRes = await api.post("/upload", { data: imageBase64, folder: "posts" });
@@ -78,9 +118,17 @@ export default function PostModal({ onClose, onPost }) {
         setUploading(false);
       }
 
+      if (videoBase64) {
+        setUploading(true);
+        const uploadRes = await api.post("/upload/video", { data: videoBase64, folder: "posts" });
+        videoUrl = uploadRes.data.url;
+        setUploading(false);
+      }
+
       const res = await api.post("/posts", {
         content: content.trim(),
         image: imageUrl,
+        video: videoUrl,
         songUrl: songPreview ? songUrl.trim() : "",
       });
 
@@ -118,6 +166,7 @@ export default function PostModal({ onClose, onPost }) {
           />
         </div>
 
+        {/* Preview imagine */}
         {imagePreview && (
           <div style={{ position: "relative", marginBottom: 12 }}>
             <img src={imagePreview} alt="preview" style={{ width: "100%", maxHeight: 300, objectFit: "cover", borderRadius: 10, border: "1px solid #333" }} />
@@ -125,6 +174,24 @@ export default function PostModal({ onClose, onPost }) {
               onClick={removeImage}
               style={{ position: "absolute", top: 8, right: 8, background: "#000000aa", border: "none", color: "#fff", borderRadius: "50%", width: 28, height: 28, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}
             >✕</button>
+          </div>
+        )}
+
+        {/* Preview video */}
+        {videoPreview && (
+          <div style={{ position: "relative", marginBottom: 12 }}>
+            <video
+              src={videoPreview}
+              controls
+              style={{ width: "100%", maxHeight: 300, borderRadius: 10, border: "1px solid #333", background: "#000" }}
+            />
+            <button
+              onClick={removeVideo}
+              style={{ position: "absolute", top: 8, right: 8, background: "#000000aa", border: "none", color: "#fff", borderRadius: "50%", width: 28, height: 28, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}
+            >✕</button>
+            <div style={{ fontSize: 11, color: "#666", marginTop: 4, textAlign: "right" }}>
+              Limită: {VIDEO_LIMIT_MB} MB {user?.isVerified ? "✅ cont verificat" : "(cont neverificat)"}
+            </div>
           </div>
         )}
 
@@ -173,13 +240,33 @@ export default function PostModal({ onClose, onPost }) {
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", gap: 8 }}>
+            {/* Buton imagine */}
             <button
               onClick={() => fileInputRef.current?.click()}
-              style={{ background: "#111", border: "1px solid #333", borderRadius: 8, color: "#aaa", cursor: "pointer", padding: "8px 12px", fontSize: 18 }}
+              disabled={!!videoBase64}
+              style={{ background: "#111", border: "1px solid #333", borderRadius: 8, color: videoBase64 ? "#444" : "#aaa", cursor: videoBase64 ? "not-allowed" : "pointer", padding: "8px 12px", fontSize: 18 }}
               title="Adaugă imagine"
             >🖼️</button>
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} style={{ display: "none" }} />
 
+            {/* Buton video */}
+            <button
+              onClick={() => videoInputRef.current?.click()}
+              disabled={!!imageBase64}
+              style={{
+                background: videoBase64 ? "#e91e8c22" : "#111",
+                border: `1px solid ${videoBase64 ? "#e91e8c" : "#333"}`,
+                borderRadius: 8,
+                color: imageBase64 ? "#444" : videoBase64 ? "#e91e8c" : "#aaa",
+                cursor: imageBase64 ? "not-allowed" : "pointer",
+                padding: "8px 12px",
+                fontSize: 18,
+              }}
+              title={`Adaugă video (max ${VIDEO_LIMIT_MB} MB${!user?.isVerified ? " — neverificat" : " — verificat"})`}
+            >🎬</button>
+            <input ref={videoInputRef} type="file" accept="video/*" onChange={handleVideoChange} style={{ display: "none" }} />
+
+            {/* Buton melodie */}
             <button
               onClick={() => setShowSongInput(s => !s)}
               style={{
@@ -199,7 +286,7 @@ export default function PostModal({ onClose, onPost }) {
             <span style={{ fontSize: 12, color: content.length > 1800 ? "#e91e8c" : "#555" }}>{content.length}/2000</span>
             <button
               onClick={handleSubmit}
-              disabled={loading || (!content.trim() && !imageBase64) || songUrlInvalid}
+              disabled={loading || (!content.trim() && !imageBase64 && !videoBase64) || songUrlInvalid}
               style={{ padding: "9px 20px", borderRadius: 10, border: "none", background: "#e91e8c", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: loading ? 0.7 : 1, fontSize: 14 }}
             >
               {uploading ? "Se urcă..." : loading ? "Se postează..." : "Postează"}

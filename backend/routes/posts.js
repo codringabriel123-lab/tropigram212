@@ -126,7 +126,7 @@ router.get("/user/:userId", auth, async (req, res) => {
 // Creare postare
 router.post("/", auth, muteCheck, async (req, res) => {
   try {
-    const { content, image, location, songUrl, songTitle } = req.body;
+    const { content, image, video, location, songUrl, songTitle } = req.body;
     if (!content?.trim()) return res.status(400).json({ message: "Conținutul este obligatoriu" });
 
     let song = undefined;
@@ -142,6 +142,7 @@ router.post("/", auth, muteCheck, async (req, res) => {
       author: req.user._id,
       content: content.trim(),
       image: image || "",
+      video: video || "",
       location: location || "",
       ...(song ? { song } : {}),
     });

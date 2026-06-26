@@ -10,6 +10,7 @@ const postSchema = new mongoose.Schema({
   author: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   content: { type: String, required: true, maxlength: 2000 },
   image: { type: String, default: "" },
+  video: { type: String, default: "" }, // URL video Cloudinary
   location: { type: String, default: "", maxlength: 60 },
   song: {
     url: { type: String, default: "" },

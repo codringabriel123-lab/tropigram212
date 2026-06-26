@@ -218,6 +218,17 @@ export default function PostCard({ post: initialPost, onDelete }) {
         </div>
       )}
 
+      {/* Video postare */}
+      {displayPost.video && (
+        <div style={{ marginBottom: 4 }}>
+          <video
+            src={displayPost.video}
+            controls
+            style={{ width: "100%", maxHeight: 500, display: "block", background: "#000" }}
+          />
+        </div>
+      )}
+
       {/* Like, Comentarii, Repost si Salvare */}
       <div style={{ display: "flex", gap: 18, padding: "6px 16px 10px", alignItems: "center" }}>
         <button onClick={handleLike} style={{ background: "transparent", border: "none", color: isLiked ? "#e91e8c" : "#666", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 22, padding: 0 }}>
