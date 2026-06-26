@@ -155,8 +155,6 @@ router.put("/me/update", auth, async (req, res) => {
   }
 });
 
-module.exports = router;
-
 // 🟢 Update lastSeen (apelat periodic din frontend)
 router.post("/me/ping", auth, async (req, res) => {
   try {
@@ -166,3 +164,5 @@ router.post("/me/ping", auth, async (req, res) => {
     res.status(500).json({ message: "Eroare" });
   }
 });
+
+module.exports = router;

@@ -139,6 +139,7 @@ export default function Layout() {
             {showMenu && (
               <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "#1a1a1a", border: "1px solid #333", borderRadius: 10, zIndex: 300, overflow: "hidden", minWidth: 160 }}>
                 <div onClick={() => { navigate(`/profile/${user._id}`); setShowMenu(false); }} style={{ padding: "10px 16px", cursor: "pointer", fontSize: 14, borderBottom: "1px solid #222" }}>👤 Profilul meu</div>
+                <div onClick={() => { navigate("/saved"); setShowMenu(false); }} style={{ padding: "10px 16px", cursor: "pointer", fontSize: 14, borderBottom: "1px solid #222" }}>🔖 Postări salvate</div>
                 {user?.isAdmin && <div onClick={() => { navigate("/admin"); setShowMenu(false); }} style={{ padding: "10px 16px", cursor: "pointer", fontSize: 14, borderBottom: "1px solid #222", color: "#e91e8c" }}>⚙️ Panel Admin</div>}
                 <div onClick={() => { logout(); navigate("/auth"); }} style={{ padding: "10px 16px", cursor: "pointer", fontSize: 14, color: "#e74c3c" }}>🚪 Deconectare</div>
               </div>

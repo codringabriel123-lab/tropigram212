@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const Post = require("../models/Post");
 const Notification = require("../models/Notification");
+const SavedPost = require("../models/SavedPost");
 const { auth, muteCheck } = require("../middleware/auth");
 
 // Extrage tip + id embed dintr-un link YouTube sau Spotify
@@ -25,6 +26,36 @@ function parseSongUrl(url) {
   return null;
 }
 
+// Adaugă pe fiecare postare (și pe originalul din repostOf) flag-urile
+// isSavedByMe / repostedByMe relative la userul curent
+async function enrichPosts(posts, userId) {
+  const targetIds = new Set();
+  posts.forEach(p => {
+    targetIds.add(p._id.toString());
+    if (p.repostOf) targetIds.add(p.repostOf._id.toString());
+  });
+
+  const [savedDocs, repostDocs] = await Promise.all([
+    SavedPost.find({ user: userId, post: { $in: [...targetIds] } }).select("post"),
+    Post.find({ author: userId, repostOf: { $in: [...targetIds] } }).select("repostOf"),
+  ]);
+  const savedSet = new Set(savedDocs.map(d => d.post.toString()));
+  const repostSet = new Set(repostDocs.map(d => d.repostOf.toString()));
+
+  return posts.map(p => {
+    const obj = p.toObject ? p.toObject() : p;
+    const targetId = obj.repostOf ? obj.repostOf._id.toString() : obj._id.toString();
+    if (obj.repostOf) {
+      obj.repostOf.isSavedByMe = savedSet.has(targetId);
+      obj.repostOf.repostedByMe = repostSet.has(targetId);
+    } else {
+      obj.isSavedByMe = savedSet.has(targetId);
+      obj.repostedByMe = repostSet.has(targetId);
+    }
+    return obj;
+  });
+}
+
 // Feed - postări de la userii urmăriți + proprii
 router.get("/feed", auth, async (req, res) => {
   try {
@@ -35,8 +66,15 @@ router.get("/feed", auth, async (req, res) => {
       .skip((page - 1) * limit)
       .limit(Number(limit))
       .populate("author", "username displayName avatar role location customRole")
-      .populate("comments.author", "username displayName avatar");
-    res.json(posts);
+      .populate("comments.author", "username displayName avatar")
+      .populate({
+        path: "repostOf",
+        populate: [
+          { path: "author", select: "username displayName avatar role location customRole" },
+          { path: "comments.author", select: "username displayName avatar" },
+        ],
+      });
+    res.json(await enrichPosts(posts, req.user._id));
   } catch (err) {
     res.status(500).json({ message: "Eroare la încărcarea feed-ului" });
   }
@@ -51,8 +89,15 @@ router.get("/explore", auth, async (req, res) => {
       .skip((page - 1) * limit)
       .limit(Number(limit))
       .populate("author", "username displayName avatar role location customRole")
-      .populate("comments.author", "username displayName avatar");
-    res.json(posts);
+      .populate("comments.author", "username displayName avatar")
+      .populate({
+        path: "repostOf",
+        populate: [
+          { path: "author", select: "username displayName avatar role location customRole" },
+          { path: "comments.author", select: "username displayName avatar" },
+        ],
+      });
+    res.json(await enrichPosts(posts, req.user._id));
   } catch (err) {
     res.status(500).json({ message: "Eroare" });
   }
@@ -64,8 +109,15 @@ router.get("/user/:userId", auth, async (req, res) => {
     const posts = await Post.find({ author: req.params.userId, isDeleted: false })
       .sort({ createdAt: -1 })
       .populate("author", "username displayName avatar role customRole")
-      .populate("comments.author", "username displayName avatar");
-    res.json(posts);
+      .populate("comments.author", "username displayName avatar")
+      .populate({
+        path: "repostOf",
+        populate: [
+          { path: "author", select: "username displayName avatar role location customRole" },
+          { path: "comments.author", select: "username displayName avatar" },
+        ],
+      });
+    res.json(await enrichPosts(posts, req.user._id));
   } catch (err) {
     res.status(500).json({ message: "Eroare" });
   }
@@ -101,7 +153,110 @@ router.post("/", auth, muteCheck, async (req, res) => {
   }
 });
 
-// Like/unlike
+// 📣 Repost — redistribuie o postare existentă pe profilul/feedul propriu
+router.post("/:id/repost", auth, muteCheck, async (req, res) => {
+  try {
+    const original = await Post.findById(req.params.id);
+    if (!original || original.isDeleted) return res.status(404).json({ message: "Postare negăsită" });
+
+    // Nu permite repost la un repost — întotdeauna leagă către postarea originală
+    const targetId = original.repostOf ? original.repostOf : original._id;
+
+    const existing = await Post.findOne({ author: req.user._id, repostOf: targetId });
+    if (existing) return res.status(400).json({ message: "Ai repostat deja această postare" });
+
+    const { comment } = req.body;
+    const repost = await Post.create({
+      author: req.user._id,
+      content: comment?.trim() || "",
+      repostOf: targetId,
+    });
+    await repost.populate("author", "username displayName avatar role location customRole");
+    await repost.populate({
+      path: "repostOf",
+      populate: [
+        { path: "author", select: "username displayName avatar role location customRole" },
+        { path: "comments.author", select: "username displayName avatar" },
+      ],
+    });
+
+    const targetPost = await Post.findById(targetId);
+    if (targetPost && targetPost.author.toString() !== req.user._id.toString()) {
+      await Notification.create({ recipient: targetPost.author, sender: req.user._id, type: "repost", post: targetId });
+    }
+
+    res.status(201).json(repost);
+  } catch (err) {
+    res.status(500).json({ message: "Eroare la repostare" });
+  }
+});
+
+// 📣 Anulează repost-ul propriu pentru o postare
+router.delete("/:id/repost", auth, async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const repost = await Post.findOne({ author: req.user._id, repostOf: targetId });
+    if (!repost) return res.status(404).json({ message: "Nu ai repostat această postare" });
+    await repost.deleteOne();
+    res.json({ message: "Repost anulat" });
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
+// 🔖 Salvează / desalvează o postare — colecție privată
+router.put("/:id/save", auth, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post || post.isDeleted) return res.status(404).json({ message: "Postare negăsită" });
+
+    const existing = await SavedPost.findOne({ user: req.user._id, post: post._id });
+    if (existing) {
+      await existing.deleteOne();
+      return res.json({ saved: false });
+    }
+    await SavedPost.create({ user: req.user._id, post: post._id });
+    res.json({ saved: true });
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
+// 🔖 Lista postărilor salvate de userul curent
+router.get("/saved", auth, async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const saved = await SavedPost.find({ user: req.user._id })
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(Number(limit))
+      .populate({
+        path: "post",
+        populate: [
+          { path: "author", select: "username displayName avatar role location customRole" },
+          { path: "comments.author", select: "username displayName avatar" },
+          {
+            path: "repostOf",
+            populate: [
+              { path: "author", select: "username displayName avatar role location customRole" },
+              { path: "comments.author", select: "username displayName avatar" },
+            ],
+          },
+        ],
+      });
+
+    // Filtrează postările care au fost șterse sau au autorul șters
+    const validSaved = saved.filter(s => s.post && !s.post.isDeleted);
+    const enriched = await enrichPosts(validSaved.map(s => s.post), req.user._id);
+    const posts = enriched.map((p, i) => ({ ...p, isSavedByMe: true, savedAt: validSaved[i].createdAt }));
+
+    res.json(posts);
+  } catch (err) {
+    res.status(500).json({ message: "Eroare la încărcarea postărilor salvate" });
+  }
+});
+
+
 router.put("/:id/like", auth, muteCheck, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);

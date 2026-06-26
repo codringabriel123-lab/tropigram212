@@ -22,6 +22,8 @@ const postSchema = new mongoose.Schema({
   isDeleted: { type: Boolean, default: false },
   deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   deletedAt: { type: Date },
+  // 📣 Repost — dacă postarea e un repost, ține legătura cu originalul
+  repostOf: { type: mongoose.Schema.Types.ObjectId, ref: "Post", default: null },
   createdAt: { type: Date, default: Date.now },
 });
 

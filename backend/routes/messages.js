@@ -2,6 +2,16 @@ const router = require("express").Router();
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
 const { auth } = require("../middleware/auth");
+const cloudinary = require("cloudinary").v2;
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Selecția folosită la populate-ul mesajului citat (reply)
+const REPLY_SELECT = "text image sender isDeleted createdAt";
 
 // Obține toate conversațiile userului curent
 router.get("/conversations", auth, async (req, res) => {
@@ -9,7 +19,7 @@ router.get("/conversations", auth, async (req, res) => {
     const conversations = await Conversation.find({ participants: req.user._id })
       .sort({ updatedAt: -1 })
       .populate("participants", "username displayName avatar")
-      .populate({ path: "lastMessage", select: "text sender createdAt read" });
+      .populate({ path: "lastMessage", select: "text image sender createdAt read" });
     res.json(conversations);
   } catch (err) {
     res.status(500).json({ message: "Eroare la încărcarea conversațiilor" });
@@ -27,7 +37,7 @@ router.post("/conversations", auth, async (req, res) => {
       participants: { $all: [req.user._id, userId], $size: 2 },
     })
       .populate("participants", "username displayName avatar")
-      .populate({ path: "lastMessage", select: "text sender createdAt read" });
+      .populate({ path: "lastMessage", select: "text image sender createdAt read" });
 
     if (!conv) {
       conv = await Conversation.create({ participants: [req.user._id, userId] });
@@ -50,7 +60,8 @@ router.get("/conversations/:convId/messages", auth, async (req, res) => {
 
     const messages = await Message.find({ conversation: req.params.convId })
       .sort({ createdAt: 1 })
-      .populate("sender", "username displayName avatar");
+      .populate("sender", "username displayName avatar")
+      .populate({ path: "replyTo", select: REPLY_SELECT, populate: { path: "sender", select: "username displayName avatar" } });
 
     // Marchează mesajele primite ca citite + seenAt
     await Message.updateMany(
@@ -64,21 +75,30 @@ router.get("/conversations/:convId/messages", auth, async (req, res) => {
   }
 });
 
-// Trimite mesaj
+// Trimite mesaj (text și/sau imagine, opțional ca reply la alt mesaj)
 router.post("/conversations/:convId/messages", auth, async (req, res) => {
   try {
-    const { text } = req.body;
-    if (!text?.trim()) return res.status(400).json({ message: "Mesajul este gol" });
+    const { text, image, replyTo } = req.body;
+    if (!text?.trim() && !image) return res.status(400).json({ message: "Mesajul este gol" });
 
     const conv = await Conversation.findById(req.params.convId);
     if (!conv) return res.status(404).json({ message: "Conversație negăsită" });
     if (!conv.participants.map(String).includes(req.user._id.toString()))
       return res.status(403).json({ message: "Acces interzis" });
 
+    // ↩️ Validează că mesajul citat (reply) apartine acestei conversații
+    let replyToId = null;
+    if (replyTo) {
+      const original = await Message.findOne({ _id: replyTo, conversation: conv._id });
+      if (original) replyToId = original._id;
+    }
+
     const msg = await Message.create({
       conversation: conv._id,
       sender: req.user._id,
-      text: text.trim(),
+      text: text?.trim() || "",
+      image: image || "",
+      replyTo: replyToId,
     });
 
     conv.lastMessage = msg._id;
@@ -86,9 +106,32 @@ router.post("/conversations/:convId/messages", auth, async (req, res) => {
     await conv.save();
 
     await msg.populate("sender", "username displayName avatar");
+    await msg.populate({ path: "replyTo", select: REPLY_SELECT, populate: { path: "sender", select: "username displayName avatar" } });
     res.status(201).json(msg);
   } catch (err) {
     res.status(500).json({ message: "Eroare la trimitere" });
+  }
+});
+
+// 📎 Upload imagine pentru DM (separat de /upload general ca să poată avea folder dedicat)
+router.post("/upload-image", auth, async (req, res) => {
+  try {
+    const { data } = req.body;
+    if (!data) return res.status(400).json({ message: "Nicio imagine trimisă" });
+
+    const result = await cloudinary.uploader.upload(data, {
+      folder: "tropical-rp/dm",
+      transformation: [
+        { width: 1080, crop: "limit" },
+        { quality: "auto" },
+        { fetch_format: "auto" },
+      ],
+    });
+
+    res.json({ url: result.secure_url });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Eroare la upload imagine" });
   }
 });
 
@@ -107,8 +150,6 @@ router.get("/unread-count", auth, async (req, res) => {
     res.status(500).json({ count: 0 });
   }
 });
-
-module.exports = router;
 
 // 🗑️ Șterge mesaj (doar al tău)
 router.delete("/:msgId", auth, async (req, res) => {
@@ -147,3 +188,5 @@ router.get("/conversations/:convId/typing", auth, async (req, res) => {
   });
   res.json({ typing });
 });
+
+module.exports = router;

@@ -29,6 +29,15 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
 
+  // 📎 Imagine de trimis în DM
+  const [imagePreview, setImagePreview] = useState(null);
+  const [imageBase64, setImageBase64] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef();
+
+  // ↩️ Reply (citat) la un mesaj specific
+  const [replyingTo, setReplyingTo] = useState(null);
+
   // ✏️ Typing indicator
   const [isTyping, setIsTyping] = useState(false);
   const typingPollRef = useRef();
@@ -76,6 +85,8 @@ export default function MessagesPage() {
     setActiveConv(conv);
     setLoadingMsgs(true);
     setIsTyping(false);
+    setReplyingTo(null);
+    removeImage();
     clearInterval(pollRef.current);
     clearInterval(typingPollRef.current);
     try {
@@ -116,8 +127,37 @@ export default function MessagesPage() {
     if (!window.confirm("Ștergi acest mesaj?")) return;
     try {
       await api.delete(`/messages/${msgId}`);
-      setMessages(prev => prev.map(m => m._id === msgId ? { ...m, isDeleted: true, text: "Mesaj șters" } : m));
+      setMessages(prev => prev.map(m => m._id === msgId ? { ...m, isDeleted: true, text: "Mesaj șters", image: "" } : m));
+      if (replyingTo?._id === msgId) setReplyingTo(null);
     } catch {}
+  };
+
+  // 📎 Selectează imagine pentru DM
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Imaginea e prea mare (max 10MB)");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result);
+      setImageBase64(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = () => {
+    setImagePreview(null);
+    setImageBase64(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // ↩️ Pregătește un reply (citat) — apăsat din bubble-ul unui mesaj
+  const startReply = (msg) => {
+    if (msg.isDeleted) return;
+    setReplyingTo(msg);
   };
 
   // Mafia chat
@@ -168,14 +208,30 @@ export default function MessagesPage() {
   }, []);
 
   const sendMessage = async () => {
-    if (!text.trim() || !activeConv || sending) return;
+    if ((!text.trim() && !imageBase64) || !activeConv || sending) return;
     setSending(true);
     try {
-      const res = await api.post(`/messages/conversations/${activeConv._id}/messages`, { text: text.trim() });
+      let imageUrl = "";
+      if (imageBase64) {
+        setUploadingImage(true);
+        const uploadRes = await api.post("/messages/upload-image", { data: imageBase64 });
+        imageUrl = uploadRes.data.url;
+        setUploadingImage(false);
+      }
+
+      const res = await api.post(`/messages/conversations/${activeConv._id}/messages`, {
+        text: text.trim(),
+        image: imageUrl,
+        replyTo: replyingTo?._id || undefined,
+      });
       setMessages(prev => [...prev, res.data]);
       setText("");
+      setReplyingTo(null);
+      removeImage();
       fetchConversations();
-    } catch {}
+    } catch {
+      setUploadingImage(false);
+    }
     setSending(false);
   };
 
@@ -222,6 +278,10 @@ export default function MessagesPage() {
     mafiaHeader: { padding: "12px 16px", borderBottom: "1px solid #330000", display: "flex", alignItems: "center", gap: 8, background: "#0d0000" },
     mafiaSenderName: { fontSize: 10, color: "#cc4444", marginBottom: 2 },
     typingIndicator: { alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 6, color: "#888", fontSize: 12, padding: "4px 0" },
+    quoteBox: (mine) => ({
+      borderLeft: `3px solid ${mine ? "#ffffff88" : "#e91e8c"}`, paddingLeft: 8, marginBottom: 6,
+      fontSize: 11, opacity: 0.85, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis",
+    }),
   };
 
   return (
@@ -262,7 +322,7 @@ export default function MessagesPage() {
                       </div>
                       {lastMsg && (
                         <div style={{ fontSize: 11, color: "#555", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {lastMsg.sender === me?._id ? "Tu: " : ""}{lastMsg.text}
+                          {lastMsg.sender?.toString() === me?._id?.toString() ? "Tu: " : ""}{lastMsg.image && !lastMsg.text ? "📎 Imagine" : lastMsg.text}
                         </div>
                       )}
                     </div>
@@ -301,14 +361,46 @@ export default function MessagesPage() {
                       return (
                         <div key={msg._id} style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start", gap: 2 }}>
                           <div style={{ position: "relative", maxWidth: "70%", display: "flex", alignItems: "center", gap: 6, flexDirection: mine ? "row-reverse" : "row" }}>
-                            <div style={s.bubble(mine, msg.isDeleted)}>{msg.isDeleted ? "🗑️ Mesaj șters" : msg.text}</div>
-                            {/* 🗑️ Delete button — doar mesajele proprii, nedeletate */}
-                            {mine && !msg.isDeleted && (
-                              <button
-                                onClick={() => handleDeleteMessage(msg._id)}
-                                style={{ background: "none", border: "none", color: "#444", cursor: "pointer", fontSize: 13, padding: "2px", opacity: 0.6, flexShrink: 0 }}
-                                title="Șterge mesaj"
-                              >🗑️</button>
+                            <div style={s.bubble(mine, msg.isDeleted)}>
+                              {msg.isDeleted ? (
+                                "🗑️ Mesaj șters"
+                              ) : (
+                                <>
+                                  {/* ↩️ Citat al mesajului la care se răspunde */}
+                                  {msg.replyTo && (
+                                    <div style={s.quoteBox(mine)}>
+                                      <div style={{ fontWeight: 700 }}>{msg.replyTo.sender?.displayName || msg.replyTo.sender?.username || "..."}</div>
+                                      <div>{msg.replyTo.isDeleted ? "Mesaj șters" : (msg.replyTo.image && !msg.replyTo.text ? "📎 Imagine" : msg.replyTo.text)}</div>
+                                    </div>
+                                  )}
+                                  {msg.image && (
+                                    <img
+                                      src={msg.image}
+                                      alt="imagine"
+                                      onClick={() => window.open(msg.image, "_blank")}
+                                      style={{ maxWidth: 220, maxHeight: 260, borderRadius: 10, display: "block", marginBottom: msg.text ? 6 : 0, cursor: "pointer" }}
+                                    />
+                                  )}
+                                  {msg.text}
+                                </>
+                              )}
+                            </div>
+                            {/* Acțiuni mesaj — reply + delete (doar mesajele proprii, nedeletate) */}
+                            {!msg.isDeleted && (
+                              <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+                                <button
+                                  onClick={() => startReply(msg)}
+                                  style={{ background: "none", border: "none", color: "#555", cursor: "pointer", fontSize: 13, padding: "2px", opacity: 0.7 }}
+                                  title="Răspunde"
+                                >↩️</button>
+                                {mine && (
+                                  <button
+                                    onClick={() => handleDeleteMessage(msg._id)}
+                                    style={{ background: "none", border: "none", color: "#444", cursor: "pointer", fontSize: 13, padding: "2px", opacity: 0.6 }}
+                                    title="Șterge mesaj"
+                                  >🗑️</button>
+                                )}
+                              </div>
                             )}
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -335,7 +427,35 @@ export default function MessagesPage() {
                     <div ref={bottomRef} />
                   </div>
 
+                  {/* ↩️ Bară "răspunzi la..." peste input */}
+                  {replyingTo && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderTop: "1px solid #1f1f1f", background: "#141414" }}>
+                      <div style={{ flex: 1, borderLeft: "3px solid #e91e8c", paddingLeft: 8, fontSize: 12, color: "#aaa", overflow: "hidden" }}>
+                        <div style={{ fontWeight: 700, color: "#e91e8c" }}>Răspunzi la {replyingTo.sender?.displayName || replyingTo.sender?.username}</div>
+                        <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {replyingTo.image && !replyingTo.text ? "📎 Imagine" : replyingTo.text}
+                        </div>
+                      </div>
+                      <button onClick={() => setReplyingTo(null)} style={{ background: "transparent", border: "none", color: "#666", fontSize: 16, cursor: "pointer" }}>✕</button>
+                    </div>
+                  )}
+
+                  {/* 📎 Previzualizare imagine selectată */}
+                  {imagePreview && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderTop: "1px solid #1f1f1f", background: "#141414" }}>
+                      <img src={imagePreview} alt="preview" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 8, border: "1px solid #333" }} />
+                      <span style={{ fontSize: 12, color: "#888", flex: 1 }}>Imagine pregătită de trimis</span>
+                      <button onClick={removeImage} style={{ background: "transparent", border: "none", color: "#666", fontSize: 16, cursor: "pointer" }}>✕</button>
+                    </div>
+                  )}
+
                   <div style={s.inputRow}>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{ background: "#1a1a1a", border: "1px solid #333", borderRadius: "50%", width: 34, height: 34, color: "#aaa", cursor: "pointer", fontSize: 15, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+                      title="Trimite imagine"
+                    >📎</button>
+                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} style={{ display: "none" }} />
                     <input
                       style={s.input}
                       placeholder="Scrie un mesaj..."
@@ -344,8 +464,8 @@ export default function MessagesPage() {
                       onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage()}
                       maxLength={1000}
                     />
-                    <button style={s.sendBtn(text.trim() && !sending, false)} onClick={sendMessage} disabled={!text.trim() || sending}>
-                      ➤
+                    <button style={s.sendBtn((text.trim() || imageBase64) && !sending, false)} onClick={sendMessage} disabled={(!text.trim() && !imageBase64) || sending}>
+                      {uploadingImage ? "…" : "➤"}
                     </button>
                   </div>
                 </>
