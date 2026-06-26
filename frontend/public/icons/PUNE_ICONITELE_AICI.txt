@@ -1,0 +1,11 @@
+Trebuie să adaugi manual 2 fișiere PNG în acest folder:
+
+1. icon-192x192.png  (192x192 pixeli)
+2. icon-512x512.png  (512x512 pixeli)
+
+Poți genera iconițele gratuit pe:
+https://realfavicongenerator.net
+sau
+https://www.pwabuilder.com/imageGenerator
+
+Folosește logo-ul sau emoji-ul 🌴 al site-ului tău.
