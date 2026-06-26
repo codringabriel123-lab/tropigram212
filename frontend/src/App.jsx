@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import AuthPage from "./pages/AuthPage";
 import FeedPage from "./pages/FeedPage";
 import ExplorePage from "./pages/ExplorePage";
@@ -9,12 +10,13 @@ import ProfilePage from "./pages/ProfilePage";
 import AdminPage from "./pages/AdminPage";
 import MessagesPage from "./pages/MessagesPage";
 import SavedPostsPage from "./pages/SavedPostsPage";
+import SettingsPage from "./pages/SettingsPage";
 import Layout from "./components/Layout";
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#0d0d0d", color: "#e91e8c", fontSize: 48 }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--bg, #0d0d0d)", color: "var(--accent, #e91e8c)", fontSize: 48 }}>
       🌴
     </div>
   );
@@ -40,6 +42,7 @@ function AppRoutes() {
         <Route path="profile/:id" element={<ProfilePage />} />
         <Route path="messages" element={<MessagesPage />} />
         <Route path="saved" element={<SavedPostsPage />} />
+        <Route path="settings" element={<SettingsPage />} />
         <Route path="admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
@@ -50,9 +53,11 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

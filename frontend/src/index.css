@@ -1,20 +1,38 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+:root {
+  --bg: #0d0d0d;
+  --surface: #1a1a1a;
+  --surface2: #222;
+  --border: #1f1f1f;
+  --border2: #2a2a2a;
+  --text: #ffffff;
+  --text-muted: #888;
+  --text-faint: #555;
+  --accent: #e91e8c;
+  --accent-hover: #c2176e;
+  --input-bg: #1a1a1a;
+  --shadow: #00000088;
+  --shadow-deep: #000000aa;
+}
+
 body {
   font-family: 'Inter', sans-serif;
-  background: #0d0d0d;
-  color: #ffffff;
+  background: var(--bg);
+  color: var(--text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  transition: background 0.25s ease, color 0.25s ease;
 }
 
 ::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: #111; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
 input, textarea, select {
   font-family: 'Inter', sans-serif;
   outline: none;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease;
 }
 
 button { font-family: 'Inter', sans-serif; cursor: pointer; }
