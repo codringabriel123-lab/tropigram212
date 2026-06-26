@@ -77,7 +77,7 @@ export default function Layout() {
   const navItems = [
     { path: "/", icon: "🏠", label: "Acasă" },
     { path: "/explore", icon: "🔍", label: "Explorează" },
-    { path: "/members", icon: "👥", label: "Membri" },
+    { path: "/top", icon: "🏆", label: "Top" },
     { path: "/messages", icon: "💬", label: "Mesaje", badge: unreadDm },
     { path: `/profile/${user?._id}`, icon: "👤", label: "Profil" },
   ];
@@ -152,6 +152,8 @@ export default function Layout() {
               <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, zIndex: 300, overflow: "hidden", minWidth: 170 }}>
                 <div onClick={() => { navigate(`/profile/${user._id}`); setShowMenu(false); }} style={{ padding: "10px 16px", cursor: "pointer", fontSize: 14, borderBottom: `1px solid ${t.border}`, color: t.text }}>👤 Profilul meu</div>
                 <div onClick={() => { navigate("/saved"); setShowMenu(false); }} style={{ padding: "10px 16px", cursor: "pointer", fontSize: 14, borderBottom: `1px solid ${t.border}`, color: t.text }}>🔖 Postări salvate</div>
+                <div onClick={() => { navigate("/members"); setShowMenu(false); }} style={{ padding: "10px 16px", cursor: "pointer", fontSize: 14, borderBottom: `1px solid ${t.border}`, color: t.text }}>👥 Membri</div>
+                <div onClick={() => { navigate("/minigame"); setShowMenu(false); }} style={{ padding: "10px 16px", cursor: "pointer", fontSize: 14, borderBottom: `1px solid ${t.border}`, color: t.text }}>🎮 Minijoc</div>
                 <div onClick={() => { navigate("/settings"); setShowMenu(false); }} style={{ padding: "10px 16px", cursor: "pointer", fontSize: 14, borderBottom: `1px solid ${t.border}`, color: t.text }}>🎨 Setări & Temă</div>
                 {user?.isAdmin && <div onClick={() => { navigate("/admin"); setShowMenu(false); }} style={{ padding: "10px 16px", cursor: "pointer", fontSize: 14, borderBottom: `1px solid ${t.border}`, color: t.accent }}>⚙️ Panel Admin</div>}
                 <div onClick={() => { logout(); navigate("/auth"); }} style={{ padding: "10px 16px", cursor: "pointer", fontSize: 14, color: "#e74c3c" }}>🚪 Deconectare</div>

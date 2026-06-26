@@ -166,3 +166,62 @@ router.post("/me/ping", auth, async (req, res) => {
 });
 
 module.exports = router;
+
+// 🏆 Leaderboard — top useri după postări, like-uri primite, urmăritori
+router.get("/leaderboard/all", auth, async (req, res) => {
+  try {
+    const Post = require("../models/Post");
+
+    // Top urmăritori — direct din User
+    const byFollowers = await User.find({ isBanned: false })
+      .select("username displayName avatar role customRole followers")
+      .populate("customRole")
+      .lean();
+
+    // Număr postări per user
+    const postCounts = await Post.aggregate([
+      { $match: { isDeleted: false, repostOf: { $exists: false } } },
+      { $group: { _id: "$author", count: { $sum: 1 } } },
+    ]);
+    const postMap = {};
+    postCounts.forEach(p => { postMap[p._id.toString()] = p.count; });
+
+    // Like-uri primite per user (suma likes pe toate postările)
+    const likeCounts = await Post.aggregate([
+      { $match: { isDeleted: false } },
+      { $group: { _id: "$author", likes: { $sum: { $size: "$likes" } } } },
+    ]);
+    const likeMap = {};
+    likeCounts.forEach(l => { likeMap[l._id.toString()] = l.likes; });
+
+    const viewer = await User.findById(req.user._id).populate("customRole");
+    const viewerCanSeeMafia = viewer?.isAdmin || viewer?.customRole?.isMafia;
+
+    const enriched = byFollowers.map(u => {
+      const id = u._id.toString();
+      if (!viewerCanSeeMafia && u.customRole?.isMafia) {
+        u.role = "Civil"; u.customRole = null;
+      }
+      return {
+        _id: u._id,
+        username: u.username,
+        displayName: u.displayName,
+        avatar: u.avatar,
+        role: u.role,
+        customRole: u.customRole,
+        followerCount: u.followers?.length || 0,
+        postCount: postMap[id] || 0,
+        likeCount: likeMap[id] || 0,
+      };
+    });
+
+    const topFollowers = [...enriched].sort((a, b) => b.followerCount - a.followerCount).slice(0, 20);
+    const topPosts = [...enriched].sort((a, b) => b.postCount - a.postCount).slice(0, 20);
+    const topLikes = [...enriched].sort((a, b) => b.likeCount - a.likeCount).slice(0, 20);
+
+    res.json({ topFollowers, topPosts, topLikes });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Eroare leaderboard" });
+  }
+});

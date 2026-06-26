@@ -11,6 +11,8 @@ import AdminPage from "./pages/AdminPage";
 import MessagesPage from "./pages/MessagesPage";
 import SavedPostsPage from "./pages/SavedPostsPage";
 import SettingsPage from "./pages/SettingsPage";
+import TopPage from "./pages/TopPage";
+import MinigamePage from "./pages/MinigamePage";
 import Layout from "./components/Layout";
 
 function PrivateRoute({ children }) {
@@ -43,6 +45,8 @@ function AppRoutes() {
         <Route path="messages" element={<MessagesPage />} />
         <Route path="saved" element={<SavedPostsPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="top" element={<TopPage />} />
+        <Route path="minigame" element={<MinigamePage />} />
         <Route path="admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
