@@ -9,11 +9,14 @@ export default function MembersPage() {
   const [users, setUsers] = useState([]);
   const [myUser, setMyUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
+    setError(false);
     Promise.all([api.get("/users"), api.get("/auth/me")])
       .then(([u, me]) => { setUsers(u.data); setMyUser(me.data); })
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
 
@@ -30,6 +33,11 @@ export default function MembersPage() {
   };
 
   if (loading) return <div style={{ textAlign: "center", padding: "4rem", color: "#555" }}>Se încarcă...</div>;
+  if (error) return (
+    <div style={{ textAlign: "center", padding: "3rem", color: "#555" }}>
+      Nu am putut încărca membrii. Verifică conexiunea și încearcă din nou.
+    </div>
+  );
 
   return (
     <div style={{ padding: "16px" }}>

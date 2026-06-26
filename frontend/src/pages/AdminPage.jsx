@@ -183,9 +183,7 @@ export default function AdminPage() {
     try {
       const r = await api.get(`/admin/users/by-ip/${encodeURIComponent(ip)}`);
       setIpModal({ ip, users: r.data.users });
-    } catch (err) {
-      alert(err.response?.data?.message || "Eroare la încărcarea conturilor cu acest IP");
-    }
+    } catch {}
   };
   const handleExportCSV = () => {
     window.open(api.defaults.baseURL + "/admin/users/export-csv", "_blank");

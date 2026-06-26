@@ -5,13 +5,23 @@ import PostCard from "../components/PostCard";
 export default function ExplorePage() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const handleDelete = (id) => setPosts(prev => prev.filter(p => p._id !== id));
 
   useEffect(() => {
-    api.get("/posts/explore").then(r => setPosts(r.data)).finally(() => setLoading(false));
+    setError(false);
+    api.get("/posts/explore")
+      .then(r => setPosts(r.data))
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <div style={{ textAlign: "center", padding: "4rem", color: "#555" }}>Se încarcă...</div>;
+  if (error) return (
+    <div style={{ textAlign: "center", padding: "3rem", color: "#555" }}>
+      Nu am putut încărca postările. Verifică conexiunea și încearcă din nou.
+    </div>
+  );
 
   return (
     <div>

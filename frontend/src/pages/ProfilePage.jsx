@@ -30,16 +30,17 @@ export default function ProfilePage() {
   const [bannerBase64, setBannerBase64] = useState(null);
   // 📊 Like count
   const [totalLikes, setTotalLikes] = useState(0);
-  const [profileTab, setProfileTab] = useState("posts"); // "posts" | "reposts"
+  // true doar daca eroarea a fost una de retea/server, nu "profil inexistent"
+  const [loadError, setLoadError] = useState(false);
 
   const isMe = id === me?._id;
 
   useEffect(() => {
     setLoading(true);
+    setLoadError(false);
     setEditMode(false);
     setAvatarPreview(null);
     setAvatarBase64(null);
-    setProfileTab("posts");
     Promise.all([api.get(`/users/${id}`), api.get(`/posts/user/${id}`)])
       .then(([u, p]) => {
         setProfile(u.data);
@@ -52,6 +53,12 @@ export default function ProfilePage() {
           location: u.data.location || "",
           role: u.data.role,
         });
+      })
+      .catch((err) => {
+        // 404 = profilul nu exista cu adevarat; orice altceva (retea, 500) e o
+        // eroare temporara, nu un "profil negăsit" definitiv.
+        if (err.response?.status !== 404) setLoadError(true);
+        setProfile(null);
       })
       .finally(() => setLoading(false));
   }, [id]);
@@ -121,6 +128,11 @@ export default function ProfilePage() {
   const handleDeletePost = (postId) => setPosts(prev => prev.filter(p => p._id !== postId));
 
   if (loading) return <div style={{ textAlign: "center", padding: "4rem", color: "#555" }}>Se încarcă...</div>;
+  if (loadError) return (
+    <div style={{ textAlign: "center", padding: "4rem", color: "#555" }}>
+      Nu am putut încărca profilul. Verifică conexiunea și încearcă din nou.
+    </div>
+  );
   if (!profile) return <div style={{ textAlign: "center", padding: "4rem", color: "#555" }}>Profil negăsit</div>;
 
   const displayAvatar = avatarPreview
@@ -310,50 +322,14 @@ export default function ProfilePage() {
         <div style={{ borderBottom: "1px solid #1f1f1f", marginBottom: 0 }} />
       </div>
 
-      {/* 📑 Tabs: Postări / Repostări */}
-      {(() => {
-        const ownPosts = posts.filter(p => !p.repostOf);
-        const repostedPosts = posts.filter(p => p.repostOf);
-        const activeList = profileTab === "posts" ? ownPosts : repostedPosts;
-
-        return (
-          <>
-            <div style={{ display: "flex", borderBottom: "1px solid #1f1f1f" }}>
-              <button
-                onClick={() => setProfileTab("posts")}
-                style={{
-                  flex: 1, padding: "12px 0", background: "transparent", border: "none",
-                  borderBottom: profileTab === "posts" ? "2px solid #e91e8c" : "2px solid transparent",
-                  color: profileTab === "posts" ? "#fff" : "#666",
-                  fontWeight: 700, fontSize: 13, cursor: "pointer",
-                }}
-              >
-                📝 Postări ({ownPosts.length})
-              </button>
-              <button
-                onClick={() => setProfileTab("reposts")}
-                style={{
-                  flex: 1, padding: "12px 0", background: "transparent", border: "none",
-                  borderBottom: profileTab === "reposts" ? "2px solid #e91e8c" : "2px solid transparent",
-                  color: profileTab === "reposts" ? "#fff" : "#666",
-                  fontWeight: 700, fontSize: 13, cursor: "pointer",
-                }}
-              >
-                🔁 Repostări ({repostedPosts.length})
-              </button>
-            </div>
-
-            {activeList.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "3rem", color: "#555" }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>{profileTab === "posts" ? "📭" : "🔁"}</div>
-                <div>{profileTab === "posts" ? "Nicio postare încă" : "Niciun repost încă"}</div>
-              </div>
-            ) : (
-              activeList.map(p => <PostCard key={p._id} post={p} onDelete={handleDeletePost} />)
-            )}
-          </>
-        );
-      })()}
+      {posts.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "3rem", color: "#555" }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+          <div>Nicio postare încă</div>
+        </div>
+      ) : (
+        posts.map(p => <PostCard key={p._id} post={p} onDelete={handleDeletePost} />)
+      )}
 
       {/* Modal urmăritori / urmăriți */}
       {showFollowModal && (

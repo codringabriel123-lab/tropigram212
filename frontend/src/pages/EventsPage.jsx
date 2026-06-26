@@ -366,11 +366,14 @@ export default function EventsPage() {
   const { user } = useAuth();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
+    setError(false);
     api.get("/events")
       .then(r => setEvents(r.data))
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
 
@@ -391,6 +394,11 @@ export default function EventsPage() {
   };
 
   if (loading) return <div style={{ textAlign: "center", padding: "4rem", color: "#555" }}>Se încarcă...</div>;
+  if (error) return (
+    <div style={{ textAlign: "center", padding: "3rem", color: "#555" }}>
+      Nu am putut încărca evenimentele. Verifică conexiunea și încearcă din nou.
+    </div>
+  );
 
   return (
     <div style={{ padding: "16px" }}>

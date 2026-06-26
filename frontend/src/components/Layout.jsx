@@ -1,6 +1,7 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import PageTransition from "./PageTransition";
+import ErrorBoundary from "./ErrorBoundary";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import api from "../api";
@@ -166,9 +167,11 @@ export default function Layout() {
 
       {/* PAGE CONTENT */}
       <div style={{ maxWidth: 680, margin: "0 auto", paddingBottom: 80 }}>
-        <PageTransition>
-          <Outlet />
-        </PageTransition>
+        <ErrorBoundary resetKey={location.pathname}>
+          <PageTransition>
+            <Outlet />
+          </PageTransition>
+        </ErrorBoundary>
       </div>
 
       {/* SCROLL TO TOP */}

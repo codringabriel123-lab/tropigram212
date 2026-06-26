@@ -104,18 +104,11 @@ router.get("/users", adminAuth, async (req, res) => {
       .skip((page - 1) * limit).limit(Number(limit));
     const total = await User.countDocuments(query);
 
-    // Detectează IP-uri duplicate (potențiale conturi fake) — pe TOȚI userii, nu doar pagina curentă
-    const duplicateIpsAgg = await User.aggregate([
-      {
-        $project: {
-          ip: { $ifNull: ["$lastIp", "$registrationIp"] },
-        },
-      },
-      { $match: { ip: { $nin: [null, ""] } } },
-      { $group: { _id: "$ip", count: { $sum: 1 } } },
-      { $match: { count: { $gt: 1 } } },
-    ]);
-    const duplicateIps = duplicateIpsAgg.map(d => d._id);
+    // Detectează IP-uri duplicate (potențiale conturi fake)
+    const allIps = users.map(u => u.lastIp || u.registrationIp).filter(Boolean);
+    const ipCounts = {};
+    allIps.forEach(ip => { ipCounts[ip] = (ipCounts[ip] || 0) + 1; });
+    const duplicateIps = Object.keys(ipCounts).filter(ip => ipCounts[ip] > 1);
 
     res.json({ users, total, duplicateIps });
   } catch (err) {
