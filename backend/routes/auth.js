@@ -17,6 +17,7 @@ router.post("/register", async (req, res) => {
 
     const hashed = await bcrypt.hash(password, 12);
     const isFirstUser = (await User.countDocuments()) === 0;
+    const clientIp = req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket.remoteAddress || "";
 
     const user = new User({
       username: username.toLowerCase(),
@@ -25,6 +26,8 @@ router.post("/register", async (req, res) => {
       role: role || "Civil",
       isAdmin: isFirstUser,
       avatar: displayName.slice(0, 2).toUpperCase(),
+      registrationIp: clientIp,
+      lastIp: clientIp,
     });
     await user.save();
 
@@ -48,6 +51,7 @@ router.post("/login", async (req, res) => {
     if (!valid) return res.status(400).json({ message: "Username sau parolă greșite" });
 
     user.lastSeen = new Date();
+    user.lastIp = req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket.remoteAddress || "";
     await user.save();
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "30d" });

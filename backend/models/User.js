@@ -26,6 +26,8 @@ const userSchema = new mongoose.Schema({
   muteExpiresAt: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now },
   lastSeen: { type: Date, default: Date.now },
+  lastIp: { type: String, default: "" },
+  registrationIp: { type: String, default: "" },
 });
 
 userSchema.virtual("postCount", {

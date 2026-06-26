@@ -247,6 +247,14 @@ export default function AdminPage() {
                       Mute: {u.muteReason || "—"} {u.muteExpiresAt ? `(expiră ${new Date(u.muteExpiresAt).toLocaleString("ro-RO")})` : "(permanent)"}
                     </div>
                   )}
+                  {(u.lastIp || u.registrationIp) && (
+                    <div style={{ fontSize: 11, color: "#666", marginTop: 4, fontFamily: "monospace" }}>
+                      🌐 IP: <span style={{ color: "#aaa" }}>{u.lastIp || "—"}</span>
+                      {u.registrationIp && u.registrationIp !== u.lastIp && (
+                        <span style={{ color: "#555" }}> (reg: {u.registrationIp})</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
