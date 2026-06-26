@@ -1,5 +1,6 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
+import PageTransition from "./PageTransition";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import api from "../api";
@@ -165,7 +166,9 @@ export default function Layout() {
 
       {/* PAGE CONTENT */}
       <div style={{ maxWidth: 680, margin: "0 auto", paddingBottom: 80 }}>
-        <Outlet />
+        <PageTransition>
+          <Outlet />
+        </PageTransition>
       </div>
 
       {/* SCROLL TO TOP */}
