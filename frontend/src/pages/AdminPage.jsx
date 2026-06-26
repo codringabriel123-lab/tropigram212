@@ -20,6 +20,7 @@ const ACTION_LABELS = {
   "delete-comment": { label: "Șterge comentariu", icon: "💬", color: "#e74c3c" },
   "verify": { label: "Verificat", icon: "✅", color: "#1da1f2" },
   "unverify": { label: "Verificare eliminată", icon: "❌", color: "#888" },
+  "delete-user": { label: "Ștergere cont", icon: "🗑️", color: "#e74c3c" },
 };
 
 // Modal simplu pentru alegerea motivului + duratei (folosit pentru ban și mute)
@@ -140,6 +141,16 @@ export default function AdminPage() {
       const r = await api.put(`/admin/users/${userId}/unmute`);
       setUsers(prev => prev.map(u => u._id === userId ? r.data.user : u));
     } catch {}
+  };
+
+  const handleDeleteUser = async (userId, username) => {
+    if (!window.confirm(`⚠️ ATENȚIE: Ștergi PERMANENT contul lui @${username} și toate datele sale (postări, mesaje etc.)? Această acțiune NU poate fi anulată!`)) return;
+    try {
+      await api.delete(`/admin/users/${userId}`);
+      setUsers(prev => prev.filter(u => u._id !== userId));
+    } catch (err) {
+      alert(err.response?.data?.message || "Eroare la ștergere");
+    }
   };
 
   const handleToggleVerify = async (userId, username, currentVerified) => {
@@ -307,6 +318,13 @@ export default function AdminPage() {
                   style={{ flex: "1 1 100%", padding: "7px", borderRadius: 8, border: `1px solid ${u.isVerified ? "#888" : "#1da1f2"}`, background: "transparent", color: u.isVerified ? "#888" : "#1da1f2", fontWeight: 600, cursor: "pointer", fontSize: 12 }}>
                   {u.isVerified ? "❌ Elimină verificarea" : "✓ Verifică contul"}
                 </button>
+
+                {!u.isAdmin && (
+                  <button onClick={() => handleDeleteUser(u._id, u.username)}
+                    style={{ flex: "1 1 100%", padding: "7px", borderRadius: 8, border: "1px solid #8b0000", background: "rgba(139,0,0,0.15)", color: "#ff4444", fontWeight: 700, cursor: "pointer", fontSize: 12 }}>
+                    🗑️ Șterge Cont
+                  </button>
+                )}
               </div>
             </div>
           ))}

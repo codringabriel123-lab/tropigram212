@@ -405,3 +405,45 @@ router.post("/users/:id/reset-password", adminAuth, async (req, res) => {
 });
 
 module.exports = router;
+
+// ─── Șterge cont user (și toate datele asociate) ───────────────────────────
+router.delete("/users/:id", adminAuth, async (req, res) => {
+  try {
+    const Post = require("../models/Post");
+    const Message = require("../models/Message");
+    const Notification = require("../models/Notification");
+    const Conversation = require("../models/Conversation");
+
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User negăsit" });
+    if (user.isAdmin) return res.status(403).json({ message: "Nu poți șterge un admin" });
+    if (user._id.toString() === req.user._id.toString())
+      return res.status(403).json({ message: "Nu îți poți șterge propriul cont" });
+
+    // Șterge postările userului
+    await Post.deleteMany({ author: user._id });
+    // Șterge notificările legate de user
+    await Notification.deleteMany({ $or: [{ recipient: user._id }, { sender: user._id }] });
+    // Șterge mesajele
+    await Message.deleteMany({ sender: user._id });
+    // Scoate userul din followeri/following ai altor useri
+    await User.updateMany({ followers: user._id }, { $pull: { followers: user._id } });
+    await User.updateMany({ following: user._id }, { $pull: { following: user._id } });
+    // Șterge conversațiile în care era participant
+    await Conversation.deleteMany({ participants: user._id });
+
+    await logAction({
+      adminId: req.user._id,
+      action: "delete-user",
+      targetUser: user._id,
+      details: `Cont @${user.username} șters permanent`,
+    });
+
+    await User.findByIdAndDelete(user._id);
+
+    res.json({ message: `Contul @${user.username} a fost șters permanent` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Eroare la ștergere" });
+  }
+});
