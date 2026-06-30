@@ -57,12 +57,27 @@ async function enrichPosts(posts, userId) {
   });
 }
 
+// Construiește filtrul de vizibilitate: postări publice + ale mele + cele "close friends"
+// ale userilor care m-au adăugat pe mine în lista lor de close friends
+async function visibilityFilter(userId) {
+  const grantedBy = await User.find({ closeFriends: userId }).select("_id");
+  const grantedIds = grantedBy.map(u => u._id);
+  return {
+    $or: [
+      { visibility: { $ne: "close" } },
+      { author: userId },
+      { visibility: "close", author: { $in: grantedIds } },
+    ],
+  };
+}
+
 // Feed - postări de la userii urmăriți + proprii
 router.get("/feed", auth, async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
     const following = [...req.user.following, req.user._id];
-    const posts = await Post.find({ author: { $in: following }, isDeleted: false })
+    const vFilter = await visibilityFilter(req.user._id);
+    const posts = await Post.find({ author: { $in: following }, isDeleted: false, ...vFilter })
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(Number(limit))
@@ -89,7 +104,8 @@ router.get("/feed", auth, async (req, res) => {
 router.get("/explore", auth, async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
-    const posts = await Post.find({ isDeleted: false })
+    const vFilter = await visibilityFilter(req.user._id);
+    const posts = await Post.find({ isDeleted: false, ...vFilter })
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(Number(limit))
@@ -115,7 +131,8 @@ router.get("/explore", auth, async (req, res) => {
 // Postările unui user
 router.get("/user/:userId", auth, async (req, res) => {
   try {
-    const posts = await Post.find({ author: req.params.userId, isDeleted: false })
+    const vFilter = await visibilityFilter(req.user._id);
+    const posts = await Post.find({ author: req.params.userId, isDeleted: false, ...vFilter })
       .sort({ createdAt: -1 })
       .populate("author", "username displayName avatar role customRole")
       .populate("taggedUsers", "username displayName avatar isVerified")
@@ -139,8 +156,8 @@ router.get("/user/:userId", auth, async (req, res) => {
 // Creare postare
 router.post("/", auth, muteCheck, async (req, res) => {
   try {
-    const { content, image, video, location, songUrl, songTitle, taggedUsers } = req.body;
-    if (!content?.trim()) return res.status(400).json({ message: "Conținutul este obligatoriu" });
+    const { content, image, images, video, location, songUrl, songTitle, taggedUsers, visibility } = req.body;
+    if (!content?.trim() && !image && !(images?.length) && !video) return res.status(400).json({ message: "Conținutul este obligatoriu" });
 
     let song = undefined;
     if (songUrl?.trim()) {
@@ -158,13 +175,17 @@ router.post("/", auth, muteCheck, async (req, res) => {
       validTagged = found.map(u => u._id);
     }
 
+    const cleanImages = Array.isArray(images) ? images.filter(Boolean).slice(0, 10) : [];
+
     const post = new Post({
       author: req.user._id,
-      content: content.trim(),
-      image: image || "",
+      content: content?.trim() || "",
+      image: cleanImages[0] || image || "",
+      images: cleanImages,
       video: video || "",
       location: location || "",
       taggedUsers: validTagged,
+      visibility: visibility === "close" ? "close" : "public",
       ...(song ? { song } : {}),
     });
     await post.save();

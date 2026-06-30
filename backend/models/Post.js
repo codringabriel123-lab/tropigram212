@@ -13,9 +13,12 @@ const commentSchema = new mongoose.Schema({
 const postSchema = new mongoose.Schema({
   author: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   content: { type: String, required: true, maxlength: 2000 },
-  image: { type: String, default: "" },
+  image: { type: String, default: "" }, // 📷 păstrat pentru compatibilitate cu postări vechi
+  images: [{ type: String }], // 🖼️ carusel — mai multe imagini per postare
   video: { type: String, default: "" }, // URL video Cloudinary
   location: { type: String, default: "", maxlength: 60 },
+  // 🟢 Vizibilitate — "public" sau doar pentru Close Friends
+  visibility: { type: String, enum: ["public", "close"], default: "public" },
   song: {
     url: { type: String, default: "" },
     type: { type: String, enum: ["youtube", "spotify", ""], default: "" },

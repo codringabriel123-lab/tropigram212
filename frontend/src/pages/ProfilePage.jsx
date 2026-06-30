@@ -19,6 +19,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [following, setFollowing] = useState(false);
   const [followsMe, setFollowsMe] = useState(false);
+  const [closeFriend, setCloseFriend] = useState(false);
+  const [togglingClose, setTogglingClose] = useState(false);
   const [showFollowModal, setShowFollowModal] = useState(null); // "followers" | "following" | null
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({});
@@ -50,6 +52,7 @@ export default function ProfilePage() {
         setPosts(p.data);
         setFollowing(u.data.followers?.map(f => f._id || f).map(String).includes(String(me?._id)));
         setFollowsMe(u.data.following?.map(f => f._id || f).map(String).includes(String(me?._id)));
+        setCloseFriend(!!u.data.isCloseFriend);
         setEditForm({
           displayName: u.data.displayName,
           bio: u.data.bio || "",
@@ -108,6 +111,16 @@ export default function ProfilePage() {
           : prev.followers.filter(f => (f._id || f).toString() !== me._id.toString()),
       }));
     } catch {}
+  };
+
+  const handleToggleCloseFriend = async () => {
+    if (togglingClose) return;
+    setTogglingClose(true);
+    try {
+      const res = await api.put(`/users/${id}/close-friend`);
+      setCloseFriend(res.data.closeFriend);
+    } catch {}
+    setTogglingClose(false);
   };
 
   const handleSave = async () => {
@@ -242,6 +255,11 @@ export default function ProfilePage() {
                 Te urmărește
               </div>
             )}
+            {closeFriend && (
+              <div style={{ fontSize: 12, color: "#2ecc71", textAlign: "center", background: "#1d7a3422", borderRadius: 8, padding: "4px 0" }}>
+                🟢 În lista ta de Close Friends
+              </div>
+            )}
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={handleFollow}
@@ -263,6 +281,20 @@ export default function ProfilePage() {
                 title="Trimite mesaj"
               >
                 💬
+              </button>
+              <button
+                onClick={handleToggleCloseFriend}
+                disabled={togglingClose}
+                style={{
+                  padding: "9px 14px", borderRadius: 10,
+                  border: `1px solid ${closeFriend ? "#2ecc71" : "#333"}`,
+                  background: closeFriend ? "#1d7a3422" : "transparent",
+                  color: closeFriend ? "#2ecc71" : "#fff",
+                  fontWeight: 600, cursor: "pointer", fontSize: 16,
+                }}
+                title={closeFriend ? "Elimină din Close Friends" : "Adaugă la Close Friends"}
+              >
+                🟢
               </button>
             </div>
           </div>

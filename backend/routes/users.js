@@ -80,6 +80,8 @@ router.get("/:id", auth, async (req, res) => {
       obj.role = "Civil";
       obj.customRole = null;
     }
+    // 🟢 Flag relativ la viewer-ul curent — e userul ăsta în lista mea de close friends?
+    obj.isCloseFriend = req.user.closeFriends?.map(id => id.toString()).includes(user._id.toString()) || false;
     res.json(obj);
   } catch (err) {
     res.status(500).json({ message: "Eroare" });
@@ -105,6 +107,26 @@ router.put("/:id/follow", auth, async (req, res) => {
       await Notification.create({ recipient: target._id, sender: req.user._id, type: "follow" });
     }
     res.json({ following: !isFollowing });
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
+// Adaugă / elimină din Close Friends (lista mea privată)
+router.put("/:id/close-friend", auth, async (req, res) => {
+  try {
+    if (req.params.id === req.user._id.toString())
+      return res.status(400).json({ message: "Nu te poți adăuga pe tine" });
+    const target = await User.findById(req.params.id);
+    if (!target) return res.status(404).json({ message: "User negăsit" });
+    const isClose = req.user.closeFriends.map(id => id.toString()).includes(target._id.toString());
+
+    if (isClose) {
+      await User.findByIdAndUpdate(req.user._id, { $pull: { closeFriends: target._id } });
+    } else {
+      await User.findByIdAndUpdate(req.user._id, { $addToSet: { closeFriends: target._id } });
+    }
+    res.json({ closeFriend: !isClose });
   } catch (err) {
     res.status(500).json({ message: "Eroare" });
   }

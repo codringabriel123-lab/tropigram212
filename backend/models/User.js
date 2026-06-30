@@ -12,6 +12,8 @@ const userSchema = new mongoose.Schema({
   location: { type: String, default: "Los Santos", maxlength: 50 },
   followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   following: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  // 🟢 Close Friends — userii cărora le pot vedea postările marcate "doar close friends"
+  closeFriends: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   isAdmin: { type: Boolean, default: false },
   isVerified: { type: Boolean, default: false },
   isBanned: { type: Boolean, default: false },

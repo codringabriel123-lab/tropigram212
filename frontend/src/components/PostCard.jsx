@@ -33,6 +33,8 @@ export default function PostCard({ post: initialPost, onDelete }) {
   const [showRepostModal, setShowRepostModal] = useState(false);
   const [repostComment, setRepostComment] = useState("");
   const [reposting, setReposting] = useState(false);
+  // Carusel imagini
+  const [imgIndex, setImgIndex] = useState(0);
 
   // Daca postarea e un repost, lucram cu postarea originala pentru continut/actiuni,
   // dar pastram header-ul "X a repostat" separat
@@ -209,13 +211,18 @@ export default function PostCard({ post: initialPost, onDelete }) {
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px 8px" }}>
-        <div onClick={() => navigate(`/profile/${displayPost.author?._id}`)} style={{ cursor: "pointer" }}>
+        <div onClick={() => navigate(`/profile/${displayPost.author?._id}`)} style={{ cursor: "pointer", borderRadius: "50%", padding: displayPost.visibility === "close" ? 2 : 0, background: displayPost.visibility === "close" ? "linear-gradient(135deg, #2ecc71, #27ae60)" : "transparent" }}>
           <Avatar user={displayPost.author} size={40} />
         </div>
         <div style={{ flex: 1 }}>
           <div onClick={() => navigate(`/profile/${displayPost.author?._id}`)} style={{ fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
             {displayPost.author?.displayName || displayPost.author?.username}
             {displayPost.author?.isVerified && <VerifiedBadge size={15} />}
+            {displayPost.visibility === "close" && (
+              <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: "#2ecc71", background: "#2ecc7122", border: "1px solid #2ecc7155", borderRadius: 8, padding: "1px 6px", verticalAlign: "middle" }}>
+                🟢 Close Friends
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 12, color: "#555" }}>
             @{displayPost.author?.username}
@@ -283,17 +290,57 @@ export default function PostCard({ post: initialPost, onDelete }) {
         </div>
       )}
 
-      {/* Imagine postare */}
-      {displayPost.image && (
-        <div style={{ marginBottom: 4 }}>
-          <img
-            src={displayPost.image}
-            alt="postare"
-            style={{ width: "100%", maxHeight: 500, objectFit: "cover", display: "block" }}
-            loading="lazy"
-          />
-        </div>
-      )}
+      {/* Imagine(i) postare - carusel daca sunt mai multe */}
+      {(() => {
+        const imgs = (displayPost.images?.length ? displayPost.images : (displayPost.image ? [displayPost.image] : []));
+        if (!imgs.length) return null;
+        const safeIndex = Math.min(imgIndex, imgs.length - 1);
+        return (
+          <div style={{ marginBottom: 4 }}>
+            <div
+              style={{ position: "relative", width: "100%", maxHeight: 500, overflow: "hidden", background: "#000" }}
+              onTouchStart={(e) => { e.currentTarget.dataset.startX = e.touches[0].clientX; }}
+              onTouchEnd={(e) => {
+                const startX = parseFloat(e.currentTarget.dataset.startX || "0");
+                const diff = e.changedTouches[0].clientX - startX;
+                if (diff > 50 && safeIndex > 0) setImgIndex(safeIndex - 1);
+                else if (diff < -50 && safeIndex < imgs.length - 1) setImgIndex(safeIndex + 1);
+              }}
+            >
+              <img
+                src={imgs[safeIndex]}
+                alt={`postare ${safeIndex + 1}`}
+                style={{ width: "100%", maxHeight: 500, objectFit: "cover", display: "block" }}
+                loading="lazy"
+              />
+              {imgs.length > 1 && (
+                <>
+                  {safeIndex > 0 && (
+                    <button
+                      onClick={() => setImgIndex(safeIndex - 1)}
+                      style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", background: "#000000aa", border: "none", color: "#fff", borderRadius: "50%", width: 28, height: 28, cursor: "pointer", fontSize: 14 }}
+                    >‹</button>
+                  )}
+                  {safeIndex < imgs.length - 1 && (
+                    <button
+                      onClick={() => setImgIndex(safeIndex + 1)}
+                      style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "#000000aa", border: "none", color: "#fff", borderRadius: "50%", width: 28, height: 28, cursor: "pointer", fontSize: 14 }}
+                    >›</button>
+                  )}
+                  <div style={{ position: "absolute", top: 10, right: 10, background: "#000000aa", color: "#fff", fontSize: 11, padding: "2px 8px", borderRadius: 10 }}>
+                    {safeIndex + 1}/{imgs.length}
+                  </div>
+                  <div style={{ position: "absolute", bottom: 8, left: 0, right: 0, display: "flex", justifyContent: "center", gap: 4 }}>
+                    {imgs.map((_, i) => (
+                      <span key={i} style={{ width: 5, height: 5, borderRadius: "50%", background: i === safeIndex ? "#fff" : "#ffffff66" }} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Video postare */}
       {displayPost.video && (

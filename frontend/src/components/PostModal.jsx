@@ -7,8 +7,7 @@ import VerifiedBadge from "./VerifiedBadge";
 export default function PostModal({ onClose, onPost }) {
   const { user } = useAuth();
   const [content, setContent] = useState("");
-  const [imagePreview, setImagePreview] = useState(null);
-  const [imageBase64, setImageBase64] = useState(null);
+  const [images, setImages] = useState([]); // [base64,...] carusel
   const [videoPreview, setVideoPreview] = useState(null);
   const [videoBase64, setVideoBase64] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -16,6 +15,8 @@ export default function PostModal({ onClose, onPost }) {
   const [error, setError] = useState("");
   const [showSongInput, setShowSongInput] = useState(false);
   const [songUrl, setSongUrl] = useState("");
+  // 🟢 Vizibilitate — postare publică sau doar pentru Close Friends
+  const [closeOnly, setCloseOnly] = useState(false);
   // 🏷️ Etichetează persoane în postare
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
@@ -68,26 +69,30 @@ export default function PostModal({ onClose, onPost }) {
   };
 
   const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      setError("Imaginea e prea mare (max 10MB)");
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    if (images.length + files.length > 10) {
+      setError("Poți adăuga maxim 10 imagini într-o postare");
       return;
     }
-    // Dacă exista video, îl scoatem
+    // Dacă există video, îl scoatem
     setVideoPreview(null);
     setVideoBase64(null);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result);
-      setImageBase64(reader.result);
-    };
-    reader.readAsDataURL(file);
+    files.forEach(file => {
+      if (file.size > 10 * 1024 * 1024) {
+        setError(`"${file.name}" e prea mare (max 10MB)`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImages(prev => [...prev, reader.result]);
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
-  const removeImage = () => {
-    setImagePreview(null);
-    setImageBase64(null);
+  const removeImageAt = (idx) => {
+    setImages(prev => prev.filter((_, i) => i !== idx));
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -105,9 +110,8 @@ export default function PostModal({ onClose, onPost }) {
       );
       return;
     }
-    // Dacă există imagine, o scoatem
-    setImagePreview(null);
-    setImageBase64(null);
+    // Dacă există imagini, le scoatem
+    setImages([]);
     const reader = new FileReader();
     reader.onloadend = () => {
       setVideoPreview(URL.createObjectURL(file));
@@ -123,7 +127,7 @@ export default function PostModal({ onClose, onPost }) {
   };
 
   const handleSubmit = async () => {
-    if (!content.trim() && !imageBase64 && !videoBase64) {
+    if (!content.trim() && images.length === 0 && !videoBase64) {
       setError("Adaugă text, o imagine sau un video");
       return;
     }
@@ -135,13 +139,15 @@ export default function PostModal({ onClose, onPost }) {
     setError("");
 
     try {
-      let imageUrl = "";
+      let imageUrls = [];
       let videoUrl = "";
 
-      if (imageBase64) {
+      if (images.length) {
         setUploading(true);
-        const uploadRes = await api.post("/upload", { data: imageBase64, folder: "posts" });
-        imageUrl = uploadRes.data.url;
+        const uploads = await Promise.all(
+          images.map(b64 => api.post("/upload", { data: b64, folder: "posts" }))
+        );
+        imageUrls = uploads.map(r => r.data.url);
         setUploading(false);
       }
 
@@ -154,10 +160,11 @@ export default function PostModal({ onClose, onPost }) {
 
       const res = await api.post("/posts", {
         content: content.trim(),
-        image: imageUrl,
+        images: imageUrls,
         video: videoUrl,
         songUrl: songPreview ? songUrl.trim() : "",
         taggedUsers: taggedUsers.map(u => u._id),
+        visibility: closeOnly ? "close" : "public",
       });
 
       onPost?.(res.data);
@@ -238,14 +245,24 @@ export default function PostModal({ onClose, onPost }) {
           </div>
         )}
 
-        {/* Preview imagine */}
-        {imagePreview && (
-          <div style={{ position: "relative", marginBottom: 12 }}>
-            <img src={imagePreview} alt="preview" style={{ width: "100%", maxHeight: 300, objectFit: "cover", borderRadius: 10, border: "1px solid #333" }} />
-            <button
-              onClick={removeImage}
-              style={{ position: "absolute", top: 8, right: 8, background: "#000000aa", border: "none", color: "#fff", borderRadius: "50%", width: 28, height: 28, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}
-            >✕</button>
+        {/* Preview imagini (carusel) */}
+        {images.length > 0 && (
+          <div style={{ display: "flex", gap: 8, overflowX: "auto", marginBottom: 12, paddingBottom: 2 }}>
+            {images.map((img, idx) => (
+              <div key={idx} style={{ position: "relative", flex: "0 0 auto" }}>
+                <img src={img} alt={`preview-${idx}`} style={{ width: 110, height: 110, objectFit: "cover", borderRadius: 10, border: "1px solid #333" }} />
+                <button
+                  onClick={() => removeImageAt(idx)}
+                  style={{ position: "absolute", top: 4, right: 4, background: "#000000aa", border: "none", color: "#fff", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}
+                >✕</button>
+              </div>
+            ))}
+            {images.length < 10 && (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                style={{ flex: "0 0 auto", width: 110, height: 110, borderRadius: 10, border: "1px dashed #444", display: "flex", alignItems: "center", justifyContent: "center", color: "#666", fontSize: 24, cursor: "pointer" }}
+              >+</div>
+            )}
           </div>
         )}
 
@@ -310,27 +327,53 @@ export default function PostModal({ onClose, onPost }) {
 
         {error && <p style={{ color: "#e91e8c", fontSize: 13, marginBottom: 10 }}>⚠️ {error}</p>}
 
+        {/* 🟢 Toggle Close Friends */}
+        <div
+          onClick={() => setCloseOnly(v => !v)}
+          style={{
+            display: "flex", alignItems: "center", gap: 8, marginBottom: 12, padding: "8px 12px",
+            borderRadius: 10, cursor: "pointer",
+            background: closeOnly ? "#1d7a3422" : "#111",
+            border: `1px solid ${closeOnly ? "#2ecc71" : "#2a2a2a"}`,
+          }}
+        >
+          <span style={{ fontSize: 16 }}>🟢</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: closeOnly ? "#2ecc71" : "#ccc" }}>Close Friends</div>
+            <div style={{ fontSize: 11, color: "#777" }}>Vizibilă doar pentru cei din lista ta de Close Friends</div>
+          </div>
+          <div style={{
+            width: 36, height: 20, borderRadius: 10, background: closeOnly ? "#2ecc71" : "#333",
+            position: "relative", transition: "background .15s",
+          }}>
+            <div style={{
+              width: 16, height: 16, borderRadius: "50%", background: "#fff", position: "absolute", top: 2,
+              left: closeOnly ? 18 : 2, transition: "left .15s",
+            }} />
+          </div>
+        </div>
+
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", gap: 8 }}>
             {/* Buton imagine */}
             <button
               onClick={() => fileInputRef.current?.click()}
-              disabled={!!videoBase64}
-              style={{ background: "#111", border: "1px solid #333", borderRadius: 8, color: videoBase64 ? "#444" : "#aaa", cursor: videoBase64 ? "not-allowed" : "pointer", padding: "8px 12px", fontSize: 18 }}
-              title="Adaugă imagine"
+              disabled={!!videoBase64 || images.length >= 10}
+              style={{ background: "#111", border: "1px solid #333", borderRadius: 8, color: (videoBase64 || images.length >= 10) ? "#444" : "#aaa", cursor: (videoBase64 || images.length >= 10) ? "not-allowed" : "pointer", padding: "8px 12px", fontSize: 18 }}
+              title="Adaugă imagini (carusel, max 10)"
             >🖼️</button>
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} style={{ display: "none" }} />
+            <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageChange} style={{ display: "none" }} />
 
             {/* Buton video */}
             <button
               onClick={() => videoInputRef.current?.click()}
-              disabled={!!imageBase64}
+              disabled={images.length > 0}
               style={{
                 background: videoBase64 ? "#e91e8c22" : "#111",
                 border: `1px solid ${videoBase64 ? "#e91e8c" : "#333"}`,
                 borderRadius: 8,
-                color: imageBase64 ? "#444" : videoBase64 ? "#e91e8c" : "#aaa",
-                cursor: imageBase64 ? "not-allowed" : "pointer",
+                color: images.length > 0 ? "#444" : videoBase64 ? "#e91e8c" : "#aaa",
+                cursor: images.length > 0 ? "not-allowed" : "pointer",
                 padding: "8px 12px",
                 fontSize: 18,
               }}
@@ -373,10 +416,10 @@ export default function PostModal({ onClose, onPost }) {
             <span style={{ fontSize: 12, color: content.length > 1800 ? "#e91e8c" : "#555" }}>{content.length}/2000</span>
             <button
               onClick={handleSubmit}
-              disabled={loading || (!content.trim() && !imageBase64 && !videoBase64) || songUrlInvalid}
-              style={{ padding: "9px 20px", borderRadius: 10, border: "none", background: "#e91e8c", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: loading ? 0.7 : 1, fontSize: 14 }}
+              disabled={loading || (!content.trim() && images.length === 0 && !videoBase64) || songUrlInvalid}
+              style={{ padding: "9px 20px", borderRadius: 10, border: "none", background: closeOnly ? "#2ecc71" : "#e91e8c", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: loading ? 0.7 : 1, fontSize: 14 }}
             >
-              {uploading ? "Se urcă..." : loading ? "Se postează..." : "Postează"}
+              {uploading ? "Se urcă..." : loading ? "Se postează..." : closeOnly ? "🟢 Postează" : "Postează"}
             </button>
           </div>
         </div>
