@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
 import Avatar from "../components/Avatar";
@@ -30,14 +31,15 @@ const ACTION_LABELS = {
 };
 
 function Modal({ title, color, onCancel, children }) {
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+  return createPortal(
+    <div style={{ position: "fixed", inset: 0, height: "100dvh", background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
       <div style={{ background: "#1a1a1a", borderRadius: 14, padding: 20, width: "100%", maxWidth: 400, border: "1px solid #2a2a2a", maxHeight: "90vh", overflowY: "auto" }}>
         <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 16, color }}>{title}</div>
         {children}
         <button onClick={onCancel} style={{ width: "100%", marginTop: 10, padding: 10, borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#888", fontWeight: 600, cursor: "pointer" }}>Anulează</button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

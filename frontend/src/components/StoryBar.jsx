@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../api";
 import Avatar from "./Avatar";
@@ -182,9 +183,9 @@ function CreateStoryModal({ onClose, onCreated }) {
     setUploading(false);
   };
 
-  return (
+  return createPortal(
     <div
-      style={{ position: "fixed", inset: 0, background: "#000000d0", zIndex: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      style={{ position: "fixed", inset: 0, height: "100dvh", background: "#000000d0", zIndex: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
       <div style={{ width: "100%", maxWidth: 380, background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 16, padding: 16 }}>
@@ -263,7 +264,8 @@ function CreateStoryModal({ onClose, onCreated }) {
           {uploading ? "Se postează..." : "Distribuie story"}
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -353,7 +355,7 @@ function StoryViewer({ groups, startIndex, onClose, onDeleted, markSeen }) {
 
   if (!story) return null;
 
-  return (
+  return createPortal(
     <div style={{ position: "fixed", inset: 0, height: "100dvh", background: "#000", zIndex: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ position: "relative", width: "100%", maxWidth: 420, height: "100%", maxHeight: 800, background: story.text ? story.background : "#111", display: "flex", flexDirection: "column" }}>
 
@@ -434,6 +436,7 @@ function StoryViewer({ groups, startIndex, onClose, onDeleted, markSeen }) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
