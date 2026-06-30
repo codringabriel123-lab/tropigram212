@@ -345,10 +345,16 @@ function StoryViewer({ groups, startIndex, onClose, onDeleted, markSeen }) {
     } catch {}
   };
 
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prevOverflow; };
+  }, []);
+
   if (!story) return null;
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ position: "fixed", inset: 0, height: "100dvh", background: "#000", zIndex: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ position: "relative", width: "100%", maxWidth: 420, height: "100%", maxHeight: 800, background: story.text ? story.background : "#111", display: "flex", flexDirection: "column" }}>
 
         {/* Bare de progres */}

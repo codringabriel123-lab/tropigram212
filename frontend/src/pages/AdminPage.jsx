@@ -270,6 +270,21 @@ export default function AdminPage() {
       {/* ── USERS ── */}
       {tab === "users" && (
         <div>
+          {/* Caută direct după IP — vizibil imediat, fără să dai scroll prin listă */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <input
+              value={filterIp}
+              onChange={e => setFilterIp(e.target.value.trim())}
+              placeholder="🌐 Caută direct după IP (ex: 192.168.1.1)..."
+              style={{ flex: 1, background: "#1a1a1a", border: "1px solid #e91e8c66", borderRadius: 10, padding: "10px 14px", color: "#fff", fontSize: 13, fontFamily: "monospace" }}
+            />
+            {filterIp && (
+              <button onClick={() => setFilterIp("")} style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #333", background: "transparent", color: "#888", cursor: "pointer", fontSize: 12 }}>
+                ✕
+              </button>
+            )}
+          </div>
+
           {/* Search + Sort + Filter */}
           <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Caută username / displayName..."
