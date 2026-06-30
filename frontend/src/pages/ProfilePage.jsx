@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../api";
 import Avatar from "../components/Avatar";
+import VerifiedBadge from "../components/VerifiedBadge";
 import PostCard from "../components/PostCard";
 import { getRoleColor, getRoleName } from "../utils/roleUtils";
 import { getRank } from "../utils/rankUtils";
@@ -175,7 +176,7 @@ export default function ProfilePage() {
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 800, fontSize: 18, display: "flex", alignItems: "center", gap: 6 }}>
               {profile.displayName}
-              {profile.isVerified && <span style={{ color: "#1da1f2", fontSize: 16 }} title="Cont verificat">✓</span>}
+              {profile.isVerified && <VerifiedBadge size={18} />}
             </div>
             <div style={{ fontSize: 13, color: "#666", marginBottom: 4 }}>@{profile.username}</div>
             <span style={{ fontSize: 11, color: getRoleColor(profile), background: "#111", padding: "3px 10px", borderRadius: 20, border: `1px solid ${getRoleColor(profile)}` }}>

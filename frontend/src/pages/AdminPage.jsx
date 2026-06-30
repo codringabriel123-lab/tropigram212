@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
 import Avatar from "../components/Avatar";
+import VerifiedBadge from "../components/VerifiedBadge";
 
 const DURATIONS = [
   { value: "1h", label: "1 oră" },
@@ -323,7 +324,7 @@ export default function AdminPage() {
                         style={{ cursor: "pointer", textDecoration: "underline dotted", textUnderlineOffset: 3 }}
                         title="Deschide profil"
                       >{u.username}</span>
-                      {u.isVerified && <span style={{ marginLeft: 6, fontSize: 10, color: "#1da1f2" }}>✓ VERIFICAT</span>}
+                      {u.isVerified && <span style={{ marginLeft: 6, display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, color: "#1da1f2" }}><VerifiedBadge size={12} /> VERIFICAT</span>}
                       {u.isAdmin && <span style={{ marginLeft: 6, fontSize: 10, color: "#e91e8c" }}>👑 ADMIN</span>}
                       {u.isBanned && <span style={{ marginLeft: 6, fontSize: 10, color: "#e74c3c" }}>🚫 BANAT</span>}
                       {u.isMuted && <span style={{ marginLeft: 6, fontSize: 10, color: "#f39c12" }}>🔇 MUTE</span>}

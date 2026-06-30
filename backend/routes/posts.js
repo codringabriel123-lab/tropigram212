@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const Post = require("../models/Post");
+const User = require("../models/User");
 const Notification = require("../models/Notification");
 const SavedPost = require("../models/SavedPost");
 const { auth, muteCheck } = require("../middleware/auth");
@@ -66,12 +67,14 @@ router.get("/feed", auth, async (req, res) => {
       .skip((page - 1) * limit)
       .limit(Number(limit))
       .populate("author", "username displayName avatar role location customRole")
-      .populate("comments.author", "username displayName avatar")
+      .populate("comments.author", "username displayName avatar isVerified")
+      .populate("comments.mentions", "username")
       .populate({
         path: "repostOf",
         populate: [
           { path: "author", select: "username displayName avatar role location customRole" },
-          { path: "comments.author", select: "username displayName avatar" },
+          { path: "comments.author", select: "username displayName avatar isVerified" },
+          { path: "comments.mentions", select: "username" },
         ],
       });
     res.json(await enrichPosts(posts, req.user._id));
@@ -89,12 +92,14 @@ router.get("/explore", auth, async (req, res) => {
       .skip((page - 1) * limit)
       .limit(Number(limit))
       .populate("author", "username displayName avatar role location customRole")
-      .populate("comments.author", "username displayName avatar")
+      .populate("comments.author", "username displayName avatar isVerified")
+      .populate("comments.mentions", "username")
       .populate({
         path: "repostOf",
         populate: [
           { path: "author", select: "username displayName avatar role location customRole" },
-          { path: "comments.author", select: "username displayName avatar" },
+          { path: "comments.author", select: "username displayName avatar isVerified" },
+          { path: "comments.mentions", select: "username" },
         ],
       });
     res.json(await enrichPosts(posts, req.user._id));
@@ -109,12 +114,14 @@ router.get("/user/:userId", auth, async (req, res) => {
     const posts = await Post.find({ author: req.params.userId, isDeleted: false })
       .sort({ createdAt: -1 })
       .populate("author", "username displayName avatar role customRole")
-      .populate("comments.author", "username displayName avatar")
+      .populate("comments.author", "username displayName avatar isVerified")
+      .populate("comments.mentions", "username")
       .populate({
         path: "repostOf",
         populate: [
           { path: "author", select: "username displayName avatar role location customRole" },
-          { path: "comments.author", select: "username displayName avatar" },
+          { path: "comments.author", select: "username displayName avatar isVerified" },
+          { path: "comments.mentions", select: "username" },
         ],
       });
     res.json(await enrichPosts(posts, req.user._id));
@@ -177,7 +184,8 @@ router.post("/:id/repost", auth, muteCheck, async (req, res) => {
       path: "repostOf",
       populate: [
         { path: "author", select: "username displayName avatar role location customRole" },
-        { path: "comments.author", select: "username displayName avatar" },
+        { path: "comments.author", select: "username displayName avatar isVerified" },
+          { path: "comments.mentions", select: "username" },
       ],
     });
 
@@ -235,12 +243,14 @@ router.get("/saved", auth, async (req, res) => {
         path: "post",
         populate: [
           { path: "author", select: "username displayName avatar role location customRole" },
-          { path: "comments.author", select: "username displayName avatar" },
+          { path: "comments.author", select: "username displayName avatar isVerified" },
+          { path: "comments.mentions", select: "username" },
           {
             path: "repostOf",
             populate: [
               { path: "author", select: "username displayName avatar role location customRole" },
-              { path: "comments.author", select: "username displayName avatar" },
+              { path: "comments.author", select: "username displayName avatar isVerified" },
+          { path: "comments.mentions", select: "username" },
             ],
           },
         ],
@@ -281,16 +291,53 @@ router.put("/:id/like", auth, muteCheck, async (req, res) => {
 // Adaugă comentariu
 router.post("/:id/comment", auth, muteCheck, async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, replyTo } = req.body;
     if (!text?.trim()) return res.status(400).json({ message: "Comentariul este gol" });
     const post = await Post.findById(req.params.id);
     if (!post || post.isDeleted) return res.status(404).json({ message: "Postare negăsită" });
-    post.comments.push({ author: req.user._id, text: text.trim() });
+
+    let replyToId = null;
+    let replyParentComment = null;
+    if (replyTo) {
+      replyParentComment = post.comments.id(replyTo);
+      if (replyParentComment) replyToId = replyParentComment._id;
+    }
+
+    // 🏷️ Extrage @username din text și găsește userii menționați
+    const tagMatches = [...text.matchAll(/@([a-zA-Z0-9_]{3,30})/g)].map(m => m[1].toLowerCase());
+    let mentionedUsers = [];
+    if (tagMatches.length) {
+      mentionedUsers = await User.find({ username: { $in: [...new Set(tagMatches)] } }).select("_id");
+    }
+
+    const newComment = {
+      author: req.user._id,
+      text: text.trim(),
+      replyTo: replyToId,
+      mentions: mentionedUsers.map(u => u._id),
+    };
+    post.comments.push(newComment);
     await post.save();
+
     if (post.author.toString() !== req.user._id.toString()) {
       await Notification.create({ recipient: post.author, sender: req.user._id, type: "comment", post: post._id });
     }
-    const updated = await Post.findById(post._id).populate("comments.author", "username displayName avatar");
+
+    // Notificare pentru reply (dacă diferit de autorul postării și de autorul reply-ului)
+    if (replyParentComment && replyParentComment.author.toString() !== req.user._id.toString()
+        && replyParentComment.author.toString() !== post.author.toString()) {
+      await Notification.create({ recipient: replyParentComment.author, sender: req.user._id, type: "reply", post: post._id });
+    }
+
+    // Notificări pentru fiecare user menționat cu @tag (exceptând autorul comentariului)
+    for (const u of mentionedUsers) {
+      if (u._id.toString() !== req.user._id.toString()) {
+        await Notification.create({ recipient: u._id, sender: req.user._id, type: "mention", post: post._id });
+      }
+    }
+
+    const updated = await Post.findById(post._id).populate("comments.author", "username displayName avatar isVerified")
+      .populate("comments.mentions", "username");
     res.json(updated.comments[updated.comments.length - 1]);
   } catch (err) {
     res.status(500).json({ message: "Eroare" });

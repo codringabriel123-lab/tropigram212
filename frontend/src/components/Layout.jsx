@@ -133,11 +133,10 @@ export default function Layout() {
                 {notifs.length === 0 && <div style={{ padding: "2rem", textAlign: "center", color: t.textFaint }}>Nicio notificare</div>}
                 {notifs.slice(0, 10).map(n => (
                   <div key={n._id} style={{ padding: "10px 16px", borderBottom: `1px solid ${t.border}`, background: n.read ? "transparent" : t.notifUnread, display: "flex", gap: 10, alignItems: "flex-start" }}>
-                    <span style={{ fontSize: 18 }}>{n.type === "like" ? "❤️" : n.type === "follow" ? "👤" : "💬"}</span>
+                    <span style={{ fontSize: 18 }}>{n.type === "like" ? "❤️" : n.type === "follow" ? "👤" : n.type === "mention" ? "🏷️" : n.type === "reply" ? "↩️" : n.type === "repost" ? "🔁" : "💬"}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 12, color: t.textMuted }}>
-                        <b style={{ color: t.text }}>{n.sender?.username}</b> {n.type === "like" ? "a dat like la postarea ta" : n.type === "follow" ? "a început să te urmărească" : "a comentat la postarea ta"}
-                      </div>
+                        <b style={{ color: t.text }}>{n.sender?.username}</b> {n.type === "like" ? "a dat like la postarea ta" : n.type === "follow" ? "a început să te urmărească" : n.type === "mention" ? "te-a menționat într-un comentariu" : n.type === "reply" ? "a răspuns la comentariul tău" : n.type === "repost" ? "a repostat postarea ta" : "a comentat la postarea ta"}</div>
                       <div style={{ fontSize: 11, color: t.textFaint, marginTop: 2 }}>{new Date(n.createdAt).toLocaleDateString("ro-RO")}</div>
                     </div>
                   </div>

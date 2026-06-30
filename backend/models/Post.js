@@ -3,6 +3,10 @@ const mongoose = require("mongoose");
 const commentSchema = new mongoose.Schema({
   author: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   text: { type: String, required: true, maxlength: 500 },
+  // 💬 Reply — dacă e răspuns la alt comentariu, ține legătura cu acela
+  replyTo: { type: mongoose.Schema.Types.ObjectId, default: null },
+  // 🏷️ Tag-uri — userii menționați cu @username în text
+  mentions: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   createdAt: { type: Date, default: Date.now },
 });
 
