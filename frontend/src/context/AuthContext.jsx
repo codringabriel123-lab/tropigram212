@@ -40,6 +40,20 @@ export function AuthProvider({ children }) {
 
   const login = async (username, password) => {
     const res = await api.post("/auth/login", { username, password });
+    // 🔐 Dacă userul are 2FA activat, backend-ul nu trimite token-ul final,
+    // ci doar un tempToken — pasul 2 se face cu verify2FALogin()
+    if (res.data.requires2FA) {
+      return { requires2FA: true, tempToken: res.data.tempToken };
+    }
+    localStorage.setItem("trp_token", res.data.token);
+    localStorage.setItem("trp_user", JSON.stringify(res.data.user));
+    setUser(res.data.user);
+    return res.data.user;
+  };
+
+  // 🔐 Pasul 2 al login-ului cu 2FA: trimite codul din aplicația de autentificare (sau un cod de backup)
+  const verify2FALogin = async (tempToken, code) => {
+    const res = await api.post("/auth/2fa/verify-login", { tempToken, code });
     localStorage.setItem("trp_token", res.data.token);
     localStorage.setItem("trp_user", JSON.stringify(res.data.user));
     setUser(res.data.user);
@@ -67,7 +81,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser, verify2FALogin }}>
       {children}
     </AuthContext.Provider>
   );

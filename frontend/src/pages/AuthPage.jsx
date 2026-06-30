@@ -19,13 +19,17 @@ const inp = {
 };
 
 export default function AuthPage() {
-  const { login, register } = useAuth();
+  const { login, register, verify2FALogin } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState("login");
   const [form, setForm] = useState({ username: "", displayName: "", password: "", role: "Civil" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // 🔐 Pasul 2 — provocarea 2FA, apare după ce username+parola sunt corecte
+  const [twoFA, setTwoFA] = useState(null); // { tempToken } sau null
+  const [twoFACode, setTwoFACode] = useState("");
 
   const handleSubmit = async () => {
     setError("");
@@ -37,7 +41,12 @@ export default function AuthPage() {
     setLoading(true);
     try {
       if (mode === "login") {
-        await login(form.username, form.password);
+        const result = await login(form.username, form.password);
+        if (result?.requires2FA) {
+          setTwoFA({ tempToken: result.tempToken });
+          setLoading(false);
+          return;
+        }
       } else {
         await register({
           username: form.username,
@@ -63,6 +72,20 @@ export default function AuthPage() {
     }
   };
 
+  const handleVerify2FA = async () => {
+    setError("");
+    if (!twoFACode.trim()) return setError("Introdu codul din aplicația de autentificare");
+    setLoading(true);
+    try {
+      await verify2FALogin(twoFA.tempToken, twoFACode.trim());
+      navigate("/");
+    } catch (err) {
+      setError(err.response?.data?.message || "Cod incorect");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: "#0d0d0d", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
       <div style={{ width: "100%", maxWidth: 420 }}>
@@ -74,6 +97,48 @@ export default function AuthPage() {
         </div>
 
         <div style={{ background: "#1a1a1a", borderRadius: 16, padding: "2rem", border: "1px solid #2a2a2a" }}>
+          {twoFA ? (
+            <>
+              <div style={{ textAlign: "center", marginBottom: 18 }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>🔐</div>
+                <div style={{ color: "#fff", fontWeight: 700, fontSize: 16 }}>Verificare în 2 pași</div>
+                <div style={{ color: "#666", fontSize: 13, marginTop: 6 }}>
+                  Introdu codul din aplicația de autentificare (sau un cod de backup)
+                </div>
+              </div>
+
+              <input
+                placeholder="Cod (ex: 123456)"
+                value={twoFACode}
+                onChange={e => setTwoFACode(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleVerify2FA()}
+                style={{ ...inp, textAlign: "center", fontSize: 18, letterSpacing: 4 }}
+                autoFocus
+              />
+
+              {error && (
+                <div style={{ background: "#2a1a1a", border: "1px solid #e91e8c44", borderRadius: 8, padding: "10px 12px", marginBottom: 12 }}>
+                  <p style={{ color: "#e91e8c", fontSize: 13, margin: 0, textAlign: "center" }}>⚠️ {error}</p>
+                </div>
+              )}
+
+              <button
+                onClick={handleVerify2FA}
+                disabled={loading}
+                style={{ width: "100%", padding: "13px", borderRadius: 10, border: "none", background: "#e91e8c", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", opacity: loading ? 0.7 : 1 }}
+              >
+                {loading ? "Se verifică..." : "Confirmă"}
+              </button>
+
+              <button
+                onClick={() => { setTwoFA(null); setTwoFACode(""); setError(""); }}
+                style={{ width: "100%", padding: "10px", marginTop: 10, borderRadius: 10, border: "1px solid #2a2a2a", background: "transparent", color: "#666", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+              >
+                ← Înapoi la conectare
+              </button>
+            </>
+          ) : (
+          <>
           <div style={{ display: "flex", gap: 0, marginBottom: "1.5rem", background: "#111", borderRadius: 10, padding: 4 }}>
             {["login", "register"].map(m => (
               <button key={m} onClick={() => { setMode(m); setError(""); }}
@@ -152,6 +217,8 @@ export default function AuthPage() {
             <p style={{ fontSize: 11, color: "#444", textAlign: "center", marginTop: 12 }}>
               Primul cont creat primește automat drepturi de admin 👑
             </p>
+          )}
+          </>
           )}
         </div>
       </div>

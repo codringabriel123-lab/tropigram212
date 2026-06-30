@@ -30,6 +30,12 @@ const userSchema = new mongoose.Schema({
   lastSeen: { type: Date, default: Date.now },
   lastIp: { type: String, default: "" },
   registrationIp: { type: String, default: "" },
+
+  // 🔐 2FA (autentificare în 2 pași, prin app gen Google Authenticator)
+  twoFactorEnabled: { type: Boolean, default: false },
+  twoFactorSecret: { type: String, default: null }, // secret activ, setat doar după confirmare
+  twoFactorTempSecret: { type: String, default: null }, // secret generat în timpul setup-ului, înainte de confirmare
+  twoFactorBackupCodes: [{ type: String }], // coduri de recuperare, stocate hash-uite (bcrypt)
 });
 
 userSchema.virtual("postCount", {
