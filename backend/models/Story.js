@@ -7,6 +7,7 @@ const storySchema = new mongoose.Schema({
   text: { type: String, default: "", maxlength: 200 }, // story de tip text simplu (fără media)
   background: { type: String, default: "#e91e8c" }, // culoare fundal pt story-uri text
   viewers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   createdAt: { type: Date, default: Date.now },
 });
 

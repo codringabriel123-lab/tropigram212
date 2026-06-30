@@ -278,6 +278,12 @@ function StoryViewer({ groups, startIndex, onClose, onDeleted, markSeen }) {
   const [paused, setPaused] = useState(false);
   const [showViewers, setShowViewers] = useState(false);
   const [viewersList, setViewersList] = useState([]);
+  const [showLikes, setShowLikes] = useState(false);
+  const [likesList, setLikesList] = useState([]);
+  const [liked, setLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(0);
+  const [heartBurst, setHeartBurst] = useState(false);
+  const lastTapRef = useRef(0);
   const timerRef = useRef(null);
   const startRef = useRef(Date.now());
 
@@ -289,6 +295,8 @@ function StoryViewer({ groups, startIndex, onClose, onDeleted, markSeen }) {
     if (!story) return;
     setProgress(0);
     startRef.current = Date.now();
+    setLiked((story.likes || []).map(v => v._id || v).map(String).includes(String(user?._id)));
+    setLikesCount((story.likes || []).length);
     if (story.author?._id !== user?._id) {
       api.put(`/stories/${story._id}/view`).catch(() => {});
       markSeen(story._id);
@@ -338,6 +346,43 @@ function StoryViewer({ groups, startIndex, onClose, onDeleted, markSeen }) {
     } catch {}
   };
 
+  const handleLike = async () => {
+    if (!story) return;
+    const wasLiked = liked;
+    setLiked(!wasLiked);
+    setLikesCount(c => wasLiked ? Math.max(0, c - 1) : c + 1);
+    if (!wasLiked) {
+      setHeartBurst(true);
+      setTimeout(() => setHeartBurst(false), 700);
+    }
+    try {
+      const res = await api.put(`/stories/${story._id}/like`);
+      setLiked(res.data.liked);
+      setLikesCount(res.data.likesCount);
+    } catch {
+      setLiked(wasLiked);
+      setLikesCount(c => wasLiked ? c + 1 : Math.max(0, c - 1));
+    }
+  };
+
+  const handleContentTap = () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      if (!liked) handleLike();
+      else { setHeartBurst(true); setTimeout(() => setHeartBurst(false), 700); }
+    }
+    lastTapRef.current = now;
+  };
+
+  const openLikes = async () => {
+    setShowLikes(true);
+    setPaused(true);
+    try {
+      const res = await api.get(`/stories/${story._id}/likes`);
+      setLikesList(res.data);
+    } catch {}
+  };
+
   const openViewers = async () => {
     setShowViewers(true);
     setPaused(true);
@@ -384,6 +429,17 @@ function StoryViewer({ groups, startIndex, onClose, onDeleted, markSeen }) {
           {isOwner && (
             <button onClick={handleDelete} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 16, cursor: "pointer", opacity: 0.8 }}>🗑️</button>
           )}
+          <button
+            onClick={handleLike}
+            style={{
+              background: "transparent", border: "none", cursor: "pointer", fontSize: 20,
+              transform: liked ? "scale(1.1)" : "scale(1)", transition: "transform 0.15s ease",
+              filter: liked ? "none" : "grayscale(1) brightness(1.6)",
+            }}
+            title={liked ? "Elimină like" : "Apreciază story-ul"}
+          >
+            {liked ? "❤️" : "🤍"}
+          </button>
           <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 22, cursor: "pointer" }}>✕</button>
         </div>
 
@@ -394,6 +450,7 @@ function StoryViewer({ groups, startIndex, onClose, onDeleted, markSeen }) {
           onMouseUp={() => setPaused(false)}
           onTouchStart={() => setPaused(true)}
           onTouchEnd={() => setPaused(false)}
+          onClick={handleContentTap}
         >
           {story.image && <img src={story.image} alt="story" style={{ width: "100%", height: "100%", objectFit: "contain" }} />}
           {story.video && <video src={story.video} autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "contain" }} />}
@@ -403,10 +460,23 @@ function StoryViewer({ groups, startIndex, onClose, onDeleted, markSeen }) {
             </div>
           )}
 
+          {heartBurst && (
+            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+              <span style={{ fontSize: 90, animation: "storyHeartBurst 0.7s ease forwards" }}>❤️</span>
+            </div>
+          )}
+
           {/* Zone de navigare (tap stânga / dreapta) */}
           <div onClick={goPrev} style={{ position: "absolute", left: 0, top: 0, width: "35%", height: "100%", cursor: "pointer" }} />
           <div onClick={goNext} style={{ position: "absolute", right: 0, top: 0, width: "35%", height: "100%", cursor: "pointer" }} />
         </div>
+
+        {/* Contor aprecieri (vizibil doar pentru autor) */}
+        {isOwner && likesCount > 0 && (
+          <div onClick={openLikes} style={{ padding: "0 14px 4px", color: "#fff", fontSize: 12, opacity: 0.85, cursor: "pointer" }}>
+            ❤️ {likesCount} aprecier{likesCount === 1 ? "e" : "i"}
+          </div>
+        )}
 
         {/* Vizualizări (doar pentru autor) */}
         {isOwner && (
@@ -424,6 +494,27 @@ function StoryViewer({ groups, startIndex, onClose, onDeleted, markSeen }) {
               <div style={{ fontWeight: 700, marginBottom: 10, color: "#fff" }}>Vizualizări ({viewersList.length})</div>
               {viewersList.length === 0 && <div style={{ color: "#666", fontSize: 13 }}>Nimeni încă</div>}
               {viewersList.map(v => (
+                <div key={v._id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
+                  <Avatar user={v} size={32} />
+                  <span style={{ color: "#ddd", fontSize: 13 }}>
+                    {v.username}
+                    {v.isVerified && <VerifiedBadge size={11} />}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {showLikes && (
+          <div
+            onClick={() => { setShowLikes(false); setPaused(false); }}
+            style={{ position: "absolute", inset: 0, background: "#000000cc", display: "flex", alignItems: "flex-end" }}
+          >
+            <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxHeight: "60%", background: "#1a1a1a", borderRadius: "16px 16px 0 0", padding: 16, overflowY: "auto" }}>
+              <div style={{ fontWeight: 700, marginBottom: 10, color: "#fff" }}>❤️ Aprecieri ({likesList.length})</div>
+              {likesList.length === 0 && <div style={{ color: "#666", fontSize: 13 }}>Nimeni încă</div>}
+              {likesList.map(v => (
                 <div key={v._id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
                   <Avatar user={v} size={32} />
                   <span style={{ color: "#ddd", fontSize: 13 }}>

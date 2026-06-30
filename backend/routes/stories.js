@@ -83,6 +83,43 @@ router.put("/:id/view", auth, async (req, res) => {
   }
 });
 
+// Like / unlike un story (toggle)
+router.put("/:id/like", auth, async (req, res) => {
+  try {
+    const story = await Story.findById(req.params.id);
+    if (!story) return res.status(404).json({ message: "Story negăsit" });
+    const uid = req.user._id.toString();
+    const liked = story.likes.map(v => v.toString()).includes(uid);
+    if (liked) {
+      story.likes = story.likes.filter(v => v.toString() !== uid);
+    } else {
+      story.likes.push(req.user._id);
+      if (story.author.toString() !== uid) {
+        const Notification = require("../models/Notification");
+        await Notification.create({ recipient: story.author, sender: req.user._id, type: "like", story: story._id }).catch(() => {});
+      }
+    }
+    await story.save();
+    res.json({ liked: !liked, likesCount: story.likes.length });
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
+// Lista celor care au dat like la un story (doar autorul îl poate vedea)
+router.get("/:id/likes", auth, async (req, res) => {
+  try {
+    const story = await Story.findById(req.params.id).populate("likes", "username displayName avatar isVerified");
+    if (!story) return res.status(404).json({ message: "Story negăsit" });
+    if (story.author.toString() !== req.user._id.toString() && !req.user.isAdmin) {
+      return res.status(403).json({ message: "Acces interzis" });
+    }
+    res.json(story.likes);
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
 // Lista celor care au văzut un story (doar autorul îl poate vedea)
 router.get("/:id/viewers", auth, async (req, res) => {
   try {
