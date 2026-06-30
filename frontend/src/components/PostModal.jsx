@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import api from "../api";
 import Avatar from "./Avatar";
+import VerifiedBadge from "./VerifiedBadge";
 
 export default function PostModal({ onClose, onPost }) {
   const { user } = useAuth();
@@ -15,6 +16,11 @@ export default function PostModal({ onClose, onPost }) {
   const [error, setError] = useState("");
   const [showSongInput, setShowSongInput] = useState(false);
   const [songUrl, setSongUrl] = useState("");
+  // 🏷️ Etichetează persoane în postare
+  const [showTagPicker, setShowTagPicker] = useState(false);
+  const [tagSearch, setTagSearch] = useState("");
+  const [tagSearchResults, setTagSearchResults] = useState([]);
+  const [taggedUsers, setTaggedUsers] = useState([]); // [{_id, username, ...}]
   const fileInputRef = useRef();
   const videoInputRef = useRef();
 
@@ -38,6 +44,27 @@ export default function PostModal({ onClose, onPost }) {
   const removeSong = () => {
     setSongUrl("");
     setShowSongInput(false);
+  };
+
+  // 🏷️ Caută useri pentru etichetare
+  const handleTagSearch = async (q) => {
+    setTagSearch(q);
+    if (!q.trim()) { setTagSearchResults([]); return; }
+    try {
+      const res = await api.get(`/users/search?q=${encodeURIComponent(q.trim())}`);
+      setTagSearchResults(res.data.filter(u => !taggedUsers.some(t => t._id === u._id) && u._id !== user?._id));
+    } catch { setTagSearchResults([]); }
+  };
+
+  const addTaggedUser = (u) => {
+    if (taggedUsers.length >= 10) return;
+    setTaggedUsers(prev => [...prev, u]);
+    setTagSearch("");
+    setTagSearchResults([]);
+  };
+
+  const removeTaggedUser = (id) => {
+    setTaggedUsers(prev => prev.filter(u => u._id !== id));
   };
 
   const handleImageChange = (e) => {
@@ -130,6 +157,7 @@ export default function PostModal({ onClose, onPost }) {
         image: imageUrl,
         video: videoUrl,
         songUrl: songPreview ? songUrl.trim() : "",
+        taggedUsers: taggedUsers.map(u => u._id),
       });
 
       onPost?.(res.data);
@@ -165,6 +193,50 @@ export default function PostModal({ onClose, onPost }) {
             autoFocus
           />
         </div>
+
+        {/* Persoane etichetate */}
+        {taggedUsers.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+            {taggedUsers.map(u => (
+              <div key={u._id} style={{ display: "flex", alignItems: "center", gap: 5, background: "#111", border: "1px solid #2a2a2a", borderRadius: 20, padding: "4px 10px 4px 4px" }}>
+                <Avatar user={u} size={20} />
+                <span style={{ fontSize: 12, color: "#ddd" }}>
+                  {u.username}
+                  {u.isVerified && <VerifiedBadge size={10} />}
+                </span>
+                <span onClick={() => removeTaggedUser(u._id)} style={{ cursor: "pointer", color: "#666", fontSize: 12, marginLeft: 2 }}>✕</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Picker pentru etichetare persoane */}
+        {showTagPicker && (
+          <div style={{ marginBottom: 12, background: "#111", border: "1px solid #2a2a2a", borderRadius: 10, padding: 10 }}>
+            <input
+              type="text"
+              placeholder="Caută un user de etichetat..."
+              value={tagSearch}
+              onChange={e => handleTagSearch(e.target.value)}
+              style={{ width: "100%", background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 8, padding: "8px 10px", color: "#fff", fontSize: 13, boxSizing: "border-box" }}
+              autoFocus
+            />
+            {tagSearchResults.length > 0 && (
+              <div style={{ marginTop: 8, maxHeight: 160, overflowY: "auto" }}>
+                {tagSearchResults.map(u => (
+                  <div key={u._id} onClick={() => addTaggedUser(u)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", cursor: "pointer" }}>
+                    <Avatar user={u} size={26} />
+                    <span style={{ fontSize: 13 }}>
+                      {u.displayName || u.username}
+                      {u.isVerified && <VerifiedBadge size={11} />}
+                    </span>
+                    <span style={{ fontSize: 11, color: "#666" }}>@{u.username}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Preview imagine */}
         {imagePreview && (
@@ -280,6 +352,21 @@ export default function PostModal({ onClose, onPost }) {
               }}
               title="Adaugă melodie"
             >🎵</button>
+
+            {/* Buton etichetare persoane */}
+            <button
+              onClick={() => setShowTagPicker(s => !s)}
+              style={{
+                background: showTagPicker || taggedUsers.length ? "#e91e8c22" : "#111",
+                border: `1px solid ${showTagPicker || taggedUsers.length ? "#e91e8c" : "#333"}`,
+                borderRadius: 8,
+                color: showTagPicker || taggedUsers.length ? "#e91e8c" : "#aaa",
+                cursor: "pointer",
+                padding: "8px 12px",
+                fontSize: 18,
+              }}
+              title="Etichetează persoane"
+            >👥</button>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

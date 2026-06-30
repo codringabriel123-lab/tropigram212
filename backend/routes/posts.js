@@ -67,12 +67,14 @@ router.get("/feed", auth, async (req, res) => {
       .skip((page - 1) * limit)
       .limit(Number(limit))
       .populate("author", "username displayName avatar role location customRole")
+      .populate("taggedUsers", "username displayName avatar isVerified")
       .populate("comments.author", "username displayName avatar isVerified")
       .populate("comments.mentions", "username")
       .populate({
         path: "repostOf",
         populate: [
           { path: "author", select: "username displayName avatar role location customRole" },
+          { path: "taggedUsers", select: "username displayName avatar isVerified" },
           { path: "comments.author", select: "username displayName avatar isVerified" },
           { path: "comments.mentions", select: "username" },
         ],
@@ -92,12 +94,14 @@ router.get("/explore", auth, async (req, res) => {
       .skip((page - 1) * limit)
       .limit(Number(limit))
       .populate("author", "username displayName avatar role location customRole")
+      .populate("taggedUsers", "username displayName avatar isVerified")
       .populate("comments.author", "username displayName avatar isVerified")
       .populate("comments.mentions", "username")
       .populate({
         path: "repostOf",
         populate: [
           { path: "author", select: "username displayName avatar role location customRole" },
+          { path: "taggedUsers", select: "username displayName avatar isVerified" },
           { path: "comments.author", select: "username displayName avatar isVerified" },
           { path: "comments.mentions", select: "username" },
         ],
@@ -114,12 +118,14 @@ router.get("/user/:userId", auth, async (req, res) => {
     const posts = await Post.find({ author: req.params.userId, isDeleted: false })
       .sort({ createdAt: -1 })
       .populate("author", "username displayName avatar role customRole")
+      .populate("taggedUsers", "username displayName avatar isVerified")
       .populate("comments.author", "username displayName avatar isVerified")
       .populate("comments.mentions", "username")
       .populate({
         path: "repostOf",
         populate: [
           { path: "author", select: "username displayName avatar role location customRole" },
+          { path: "taggedUsers", select: "username displayName avatar isVerified" },
           { path: "comments.author", select: "username displayName avatar isVerified" },
           { path: "comments.mentions", select: "username" },
         ],
@@ -133,7 +139,7 @@ router.get("/user/:userId", auth, async (req, res) => {
 // Creare postare
 router.post("/", auth, muteCheck, async (req, res) => {
   try {
-    const { content, image, video, location, songUrl, songTitle } = req.body;
+    const { content, image, video, location, songUrl, songTitle, taggedUsers } = req.body;
     if (!content?.trim()) return res.status(400).json({ message: "Conținutul este obligatoriu" });
 
     let song = undefined;
@@ -145,16 +151,32 @@ router.post("/", auth, muteCheck, async (req, res) => {
       song = { ...parsed, title: songTitle?.trim().slice(0, 150) || "" };
     }
 
+    // 🏷️ Validează userii etichetați (max 10, doar id-uri existente)
+    let validTagged = [];
+    if (Array.isArray(taggedUsers) && taggedUsers.length) {
+      const found = await User.find({ _id: { $in: taggedUsers.slice(0, 10) } }).select("_id");
+      validTagged = found.map(u => u._id);
+    }
+
     const post = new Post({
       author: req.user._id,
       content: content.trim(),
       image: image || "",
       video: video || "",
       location: location || "",
+      taggedUsers: validTagged,
       ...(song ? { song } : {}),
     });
     await post.save();
     await post.populate("author", "username displayName avatar role location customRole");
+    await post.populate("taggedUsers", "username displayName avatar isVerified");
+
+    for (const uid of validTagged) {
+      if (uid.toString() !== req.user._id.toString()) {
+        await Notification.create({ recipient: uid, sender: req.user._id, type: "mention", post: post._id });
+      }
+    }
+
     res.status(201).json(post);
   } catch (err) {
     res.status(500).json({ message: "Eroare la postare" });
@@ -243,6 +265,7 @@ router.get("/saved", auth, async (req, res) => {
         path: "post",
         populate: [
           { path: "author", select: "username displayName avatar role location customRole" },
+          { path: "taggedUsers", select: "username displayName avatar isVerified" },
           { path: "comments.author", select: "username displayName avatar isVerified" },
           { path: "comments.mentions", select: "username" },
           {

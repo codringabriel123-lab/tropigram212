@@ -23,6 +23,8 @@ const postSchema = new mongoose.Schema({
     title: { type: String, default: "", maxlength: 150 },
   },
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  // 🏷️ Useri etichetați direct în postare (gen "cu @cineva")
+  taggedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   comments: [commentSchema],
   isDeleted: { type: Boolean, default: false },
   deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

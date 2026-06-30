@@ -221,6 +221,23 @@ export default function PostCard({ post: initialPost, onDelete }) {
             @{displayPost.author?.username}
             {displayPost.location && <span> · 📍 {displayPost.location}</span>}
           </div>
+          {displayPost.taggedUsers?.length > 0 && (
+            <div style={{ fontSize: 12, color: "#888", marginTop: 1 }}>
+              cu{" "}
+              {displayPost.taggedUsers.map((u, i) => (
+                <span key={u._id}>
+                  <span
+                    onClick={(e) => { e.stopPropagation(); navigate(`/profile/${u._id}`); }}
+                    style={{ color: "#e91e8c", fontWeight: 600, cursor: "pointer" }}
+                  >
+                    @{u.username}
+                  </span>
+                  {u.isVerified && <VerifiedBadge size={10} />}
+                  {i < displayPost.taggedUsers.length - 1 ? ", " : ""}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div style={{ fontSize: 12, color: "#555" }}>{timeAgo(displayPost.createdAt)}</div>
         {(isOwner || isAdmin) && (
