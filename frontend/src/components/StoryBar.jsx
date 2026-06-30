@@ -47,43 +47,48 @@ export default function StoryBar() {
   };
 
   return (
-    <div style={{ display: "flex", gap: 14, overflowX: "auto", padding: "14px 16px", borderBottom: "1px solid #1a1a1a" }}>
+    <div
+      className="story-bar-scroll"
+      style={{ display: "flex", gap: 10, overflowX: "auto", overflowY: "hidden", padding: "10px 12px", borderBottom: "1px solid #1a1a1a" }}
+    >
+      <style>{`.story-bar-scroll::-webkit-scrollbar { display: none; height: 0; } .story-bar-scroll { scrollbar-width: none; }`}</style>
+
       {/* Story-ul propriu / adaugă story */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flexShrink: 0, cursor: "pointer" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flexShrink: 0, cursor: "pointer" }}>
         <div
           onClick={() => myGroup ? setViewerIndex(groups.findIndex(g => g.author._id === user._id)) : setShowCreate(true)}
           style={{
-            width: 60, height: 60, borderRadius: "50%", padding: 2, position: "relative",
+            width: 50, height: 50, borderRadius: "50%", padding: 2, position: "relative",
             background: myGroup ? (hasUnseen(myGroup) ? "linear-gradient(135deg, #e91e8c, #f59e0b)" : "#333") : "transparent",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}
         >
-          <Avatar user={user} size={myGroup ? 56 : 60} />
+          <Avatar user={user} size={myGroup ? 46 : 50} />
           <div
             onClick={(e) => { e.stopPropagation(); setShowCreate(true); }}
             style={{
-              position: "absolute", bottom: -2, right: -2, width: 20, height: 20, borderRadius: "50%",
-              background: "#e91e8c", border: "2px solid #0d0d0d", color: "#fff", fontSize: 13,
+              position: "absolute", bottom: -2, right: -2, width: 17, height: 17, borderRadius: "50%",
+              background: "#e91e8c", border: "2px solid #0d0d0d", color: "#fff", fontSize: 11,
               display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
             }}
           >+</div>
         </div>
-        <span style={{ fontSize: 11, color: "#888" }}>Story-ul tău</span>
+        <span style={{ fontSize: 10, color: "#888" }}>Tu</span>
       </div>
 
       {otherGroups.map((g, i) => {
         const unseen = hasUnseen(g);
         const realIndex = groups.findIndex(gr => gr.author._id === g.author._id);
         return (
-          <div key={g.author._id} onClick={() => setViewerIndex(realIndex)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flexShrink: 0, cursor: "pointer" }}>
+          <div key={g.author._id} onClick={() => setViewerIndex(realIndex)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flexShrink: 0, cursor: "pointer" }}>
             <div style={{
-              width: 60, height: 60, borderRadius: "50%", padding: 2,
+              width: 50, height: 50, borderRadius: "50%", padding: 2,
               background: unseen ? "linear-gradient(135deg, #e91e8c, #f59e0b)" : "#333",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
-              <Avatar user={g.author} size={56} />
+              <Avatar user={g.author} size={46} />
             </div>
-            <span style={{ fontSize: 11, color: "#888", maxWidth: 62, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <span style={{ fontSize: 10, color: "#888", maxWidth: 52, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {g.author.username}
             </span>
           </div>
