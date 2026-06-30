@@ -15,6 +15,7 @@ const messageRoutes = require("./routes/messages");
 const mafiaRoutes = require("./routes/mafia");
 const announcementRoutes = require("./routes/announcements");
 const reportRoutes = require("./routes/reports");
+const storyRoutes = require("./routes/stories");
 
 const app = express();
 
@@ -53,6 +54,7 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/mafia", mafiaRoutes);
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/stories", storyRoutes);
 
 app.get("/api/health", (req, res) => res.json({ status: "ok", time: new Date() }));
 

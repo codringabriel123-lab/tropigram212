@@ -3,6 +3,7 @@ import api from "../api";
 import PostCard from "../components/PostCard";
 import PostModal from "../components/PostModal";
 import AnnouncementBanner from "../components/AnnouncementBanner";
+import StoryBar from "../components/StoryBar";
 
 export default function FeedPage() {
   const [posts, setPosts] = useState([]);
@@ -26,6 +27,9 @@ export default function FeedPage() {
 
   return (
     <div>
+      {/* 🟢 Story-uri */}
+      <StoryBar />
+
       {/* 📌 Anunțuri admin */}
       <AnnouncementBanner />
 
@@ -40,7 +44,7 @@ export default function FeedPage() {
         </div>
       )}
       {posts.map(p => <PostCard key={p._id} post={p} onDelete={handleDelete} />)}
-      {showModal && <PostModal onClose={() => setShowModal(false)} onPosted={handlePosted} />}
+      {showModal && <PostModal onClose={() => setShowModal(false)} onPost={handlePosted} />}
     </div>
   );
 }
