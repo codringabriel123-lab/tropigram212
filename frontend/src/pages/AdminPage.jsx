@@ -28,7 +28,12 @@ const ACTION_LABELS = {
   "reset-password": { label: "Reset parolă", icon: "🔑", color: "#ff9800" },
   "resolve-report": { label: "Rezolvat raport", icon: "✅", color: "#2ecc71" },
   "assign-role": { label: "Atribuire rol", icon: "🎭", color: "#9b59b6" },
+  "create-role": { label: "Rol creat", icon: "🆕", color: "#9b59b6" },
+  "edit-role": { label: "Rol editat", icon: "✏️", color: "#9b59b6" },
+  "delete-role": { label: "Rol șters", icon: "🗑️", color: "#e74c3c" },
 };
+
+const AUDIT_ACTION_OPTIONS = Object.keys(ACTION_LABELS);
 
 function Modal({ title, color, onCancel, children }) {
   return createPortal(
@@ -87,12 +92,37 @@ function MiniBarChart({ data }) {
   );
 }
 
+// Grupează logurile de audit pe zile, cu etichete prietenoase (Azi / Ieri / dată)
+function groupLogsByDay(logs) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+  const groups = [];
+  const map = {};
+  logs.forEach(log => {
+    const d = new Date(log.createdAt);
+    const dayKey = d.toDateString();
+    let label;
+    if (dayKey === today.toDateString()) label = "Azi";
+    else if (dayKey === yesterday.toDateString()) label = "Ieri";
+    else label = d.toLocaleDateString("ro-RO", { day: "2-digit", month: "long", year: "numeric" });
+    if (!map[dayKey]) { map[dayKey] = { label, items: [] }; groups.push(map[dayKey]); }
+    map[dayKey].items.push(log);
+  });
+  return groups;
+}
+
 export default function AdminPage() {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [duplicateIps, setDuplicateIps] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditAction, setAuditAction] = useState("");
+  const [auditSearch, setAuditSearch] = useState("");
+  const AUDIT_LIMIT = 30;
   const [reports, setReports] = useState([]);
   const [tab, setTab] = useState("stats");
   const [search, setSearch] = useState("");
@@ -123,12 +153,27 @@ export default function AdminPage() {
     api.get("/admin/stats").then(r => setStats(r.data)).finally(() => setLoading(false));
   }, []);
 
+  const loadAuditLog = (page = 1) => {
+    setAuditLoading(true);
+    let url = `/admin/audit-log?page=${page}&limit=${AUDIT_LIMIT}`;
+    if (auditAction) url += `&action=${encodeURIComponent(auditAction)}`;
+    if (auditSearch.trim()) url += `&search=${encodeURIComponent(auditSearch.trim())}`;
+    api.get(url)
+      .then(r => {
+        setLogs(prev => page === 1 ? r.data.logs : [...prev, ...r.data.logs]);
+        setAuditTotal(r.data.total);
+        setAuditPage(page);
+      })
+      .finally(() => setAuditLoading(false));
+  };
+
   useEffect(() => {
+    if (tab === "stats") api.get("/admin/stats").then(r => setStats(r.data));
     if (tab === "users") loadUsers();
-    if (tab === "audit") api.get("/admin/audit-log").then(r => setLogs(r.data.logs));
+    if (tab === "audit") loadAuditLog(1);
     if (tab === "roles") api.get("/admin/roles").then(r => setRoles(r.data));
     if (tab === "reports") api.get(`/admin/reports?status=${reportFilter}`).then(r => setReports(r.data.reports));
-  }, [tab, search, sortBy, filterIp, reportFilter]);
+  }, [tab, search, sortBy, filterIp, reportFilter, auditAction, auditSearch]);
 
   // ── Handlers ──
   const handleBanConfirm = async ({ reason, duration }) => {
@@ -209,7 +254,7 @@ export default function AdminPage() {
     { id: "users", label: "👥 Useri" },
     { id: "reports", label: `🚨 Rapoarte${stats?.pendingReports ? ` (${stats.pendingReports})` : ""}` },
     { id: "broadcast", label: "📢 Broadcast" },
-    { id: "audit", label: "📋 Audit" },
+    { id: "audit", label: `📋 Audit${auditTotal ? ` (${auditTotal})` : ""}` },
     { id: "roles", label: "🎭 Roluri" },
   ];
 
@@ -217,16 +262,18 @@ export default function AdminPage() {
 
   return (
     <div style={{ maxWidth: 700, margin: "0 auto", padding: "16px 12px" }}>
-      <div style={{ fontWeight: 900, fontSize: 20, marginBottom: 16, color: "#e91e8c" }}>⚙️ Admin Panel</div>
+      <div style={{ position: "sticky", top: 0, zIndex: 10, background: "#0d0d0d", paddingBottom: 10, marginBottom: 6 }}>
+        <div style={{ fontWeight: 900, fontSize: 20, marginBottom: 16, color: "#e91e8c" }}>⚙️ Admin Panel</div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            style={{ padding: "7px 14px", borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: "pointer", border: `1px solid ${tab === t.id ? "#e91e8c" : "#2a2a2a"}`, background: tab === t.id ? "#e91e8c" : "transparent", color: tab === t.id ? "#fff" : "#888" }}>
-            {t.label}
-          </button>
-        ))}
+        {/* Tabs */}
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              style={{ padding: "7px 14px", borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: "pointer", border: `1px solid ${tab === t.id ? "#e91e8c" : "#2a2a2a"}`, background: tab === t.id ? "#e91e8c" : "transparent", color: tab === t.id ? "#fff" : "#888" }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── STATS ── */}
@@ -466,24 +513,83 @@ export default function AdminPage() {
       {/* ── AUDIT ── */}
       {tab === "audit" && (
         <div>
-          {logs.length === 0 && <div style={{ color: "#555", textAlign: "center", padding: "2rem" }}>Niciun log</div>}
-          {logs.map(log => {
-            const meta = ACTION_LABELS[log.action] || { label: log.action, icon: "•", color: "#888" };
-            return (
-              <div key={log._id} style={{ background: "#1a1a1a", borderRadius: 10, padding: "10px 14px", marginBottom: 8, border: "1px solid #2a2a2a" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <span>{meta.icon}</span>
-                  <span style={{ fontWeight: 700, fontSize: 13, color: meta.color }}>{meta.label}</span>
-                  <span style={{ marginLeft: "auto", fontSize: 11, color: "#555" }}>{new Date(log.createdAt).toLocaleString("ro-RO")}</span>
-                </div>
-                <div style={{ fontSize: 12, color: "#666" }}>
-                  <strong style={{ color: "#e91e8c" }}>{log.admin?.username || "?"}</strong>
-                  {log.targetUser && <> → <strong>{log.targetUser?.username}</strong></>}
-                  {log.details && <span style={{ color: "#555" }}> — {log.details}</span>}
-                </div>
+          {/* Filtre */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+            <input
+              value={auditSearch}
+              onChange={e => setAuditSearch(e.target.value)}
+              placeholder="🔍 Caută după admin sau user vizat..."
+              style={{ flex: "1 1 200px", background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 10, padding: "10px 14px", color: "#fff", fontSize: 13 }}
+            />
+            <select value={auditAction} onChange={e => setAuditAction(e.target.value)}
+              style={{ background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 10, padding: "10px 12px", color: "#fff", fontSize: 13 }}>
+              <option value="">Toate acțiunile</option>
+              {AUDIT_ACTION_OPTIONS.map(a => (
+                <option key={a} value={a}>{ACTION_LABELS[a].icon} {ACTION_LABELS[a].label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ fontSize: 12, color: "#555", marginBottom: 10 }}>
+            {auditTotal} acțiun{auditTotal === 1 ? "e" : "i"} în total{auditAction || auditSearch ? " (filtrat)" : ""}
+          </div>
+
+          {!auditLoading && logs.length === 0 && (
+            <div style={{ color: "#555", textAlign: "center", padding: "2rem" }}>Niciun log găsit</div>
+          )}
+
+          {groupLogsByDay(logs).map(group => (
+            <div key={group.label} style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: 0.5, margin: "10px 0 6px 2px" }}>
+                {group.label}
               </div>
-            );
-          })}
+              {group.items.map(log => {
+                const meta = ACTION_LABELS[log.action] || { label: log.action, icon: "•", color: "#888" };
+                return (
+                  <div key={log._id} style={{ background: "#1a1a1a", borderRadius: 10, padding: "10px 14px", marginBottom: 8, border: "1px solid #2a2a2a", borderLeft: `3px solid ${meta.color}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span>{meta.icon}</span>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: meta.color }}>{meta.label}</span>
+                      <span style={{ marginLeft: "auto", fontSize: 11, color: "#555" }}>
+                        {new Date(log.createdAt).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#666" }}>
+                      <strong style={{ color: "#e91e8c", cursor: log.admin?._id ? "pointer" : "default" }}
+                        onClick={() => log.admin?._id && navigate(`/profile/${log.admin._id}`)}>
+                        {log.admin?.username || "?"}
+                      </strong>
+                      {log.targetUser && (
+                        <> {" → "}
+                          <strong style={{ cursor: "pointer", color: "#ccc" }} onClick={() => navigate(`/profile/${log.targetUser._id}`)}>
+                            {log.targetUser?.username}
+                          </strong>
+                        </>
+                      )}
+                      {log.targetPost?.content && (
+                        <div style={{ fontSize: 11, color: "#555", marginTop: 4, fontStyle: "italic", background: "#111", borderRadius: 6, padding: "4px 8px" }}>
+                          "{log.targetPost.content.slice(0, 80)}{log.targetPost.content.length > 80 ? "…" : ""}"
+                        </div>
+                      )}
+                      {log.reason && <div style={{ color: "#888", marginTop: 4 }}>Motiv: {log.reason}</div>}
+                      {log.details && <span style={{ color: "#555" }}> — {log.details}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+
+          {auditLoading && (
+            <div style={{ textAlign: "center", padding: "1.5rem", color: "#555", fontSize: 13 }}>Se încarcă...</div>
+          )}
+
+          {!auditLoading && logs.length < auditTotal && (
+            <button onClick={() => loadAuditLog(auditPage + 1)}
+              style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#888", fontWeight: 600, cursor: "pointer", fontSize: 13, marginTop: 6 }}>
+              Încarcă mai multe ({auditTotal - logs.length} rămase)
+            </button>
+          )}
         </div>
       )}
 

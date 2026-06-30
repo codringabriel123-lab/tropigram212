@@ -2,12 +2,12 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
-import { getRank } from "../utils/rankUtils";
 import { getRoleColor } from "../utils/roleUtils";
 import api from "../api";
 import Avatar from "../components/Avatar";
 
 const TABS = [
+  { key: "topOverall", label: "General", icon: "⭐", field: "score", suffix: " pct" },
   { key: "topFollowers", label: "Urmăritori", icon: "👥", field: "followerCount", suffix: " fans" },
   { key: "topPosts", label: "Postări", icon: "📝", field: "postCount", suffix: " posturi" },
   { key: "topLikes", label: "Like-uri", icon: "❤️", field: "likeCount", suffix: " likes" },
@@ -15,20 +15,43 @@ const TABS = [
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
+function TopSkeleton({ t }) {
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 12, marginBottom: 24, padding: "0 8px" }}>
+        {[70, 90, 55].map((h, i) => (
+          <div key={i} style={{ flex: i === 1 ? 1.2 : 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", background: t.border, marginBottom: 8, opacity: 0.5 }} />
+            <div style={{ width: "100%", height: h, background: t.border, opacity: 0.3, borderRadius: "8px 8px 0 0" }} />
+          </div>
+        ))}
+      </div>
+      {[0, 1, 2].map(i => (
+        <div key={i} style={{ height: 58, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, marginBottom: 6, opacity: 0.6 }} />
+      ))}
+    </div>
+  );
+}
+
 export default function TopPage() {
   const { theme: t } = useTheme();
   const { user: me } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState("topFollowers");
+  const [tab, setTab] = useState("topOverall");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
+  const load = () => {
+    setLoading(true);
+    setError(false);
     api.get("/users/leaderboard/all")
       .then(res => setData(res.data))
-      .catch(() => {})
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { load(); }, []);
 
   const currentTab = TABS.find(t => t.key === tab);
   const list = data?.[tab] || [];
@@ -63,15 +86,25 @@ export default function TopPage() {
         ))}
       </div>
 
-      {loading && (
-        <div style={{ textAlign: "center", padding: "3rem", color: t.textMuted, fontSize: 32 }}>⏳</div>
+      {loading && <TopSkeleton t={t} />}
+
+      {!loading && error && (
+        <div style={{ textAlign: "center", padding: "3rem", color: t.textFaint }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
+          Nu am putut încărca topul.
+          <div>
+            <button onClick={load} style={{ marginTop: 12, padding: "8px 18px", borderRadius: 10, border: `1px solid ${t.accent}`, background: "transparent", color: t.accent, fontWeight: 700, cursor: "pointer" }}>
+              Reîncearcă
+            </button>
+          </div>
+        </div>
       )}
 
-      {!loading && list.length === 0 && (
+      {!loading && !error && list.length === 0 && (
         <div style={{ textAlign: "center", padding: "3rem", color: t.textFaint }}>Niciun rezultat</div>
       )}
 
-      {!loading && list.length > 0 && (
+      {!loading && !error && list.length > 0 && (
         <>
           {/* PODIUM */}
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 12, marginBottom: 24, padding: "0 8px" }}>
@@ -91,7 +124,6 @@ export default function TopPage() {
 
           {/* REST */}
           {rest.map((u, i) => {
-            const rank = getRank(u.postCount);
             const isMe = u._id === me?._id;
             return (
               <div key={u._id} onClick={() => navigate(`/profile/${u._id}`)}

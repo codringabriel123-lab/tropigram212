@@ -365,10 +365,23 @@ router.put("/posts/:id/restore", adminAuth, async (req, res) => {
 // ── Audit log ──────────────────────────────────────────────
 router.get("/audit-log", adminAuth, async (req, res) => {
   try {
-    const { page = 1, limit = 50, action = "", adminId = "" } = req.query;
+    const { page = 1, limit = 30, action = "", adminId = "", search = "" } = req.query;
     const query = {};
     if (action) query.action = action;
     if (adminId) query.admin = adminId;
+
+    // Căutare după username admin/target — rezolvăm întâi userii care match-uiesc
+    if (search?.trim()) {
+      const matchedUsers = await User.find({
+        $or: [
+          { username: { $regex: search.trim(), $options: "i" } },
+          { displayName: { $regex: search.trim(), $options: "i" } },
+        ],
+      }).select("_id");
+      const ids = matchedUsers.map(u => u._id);
+      query.$or = [{ admin: { $in: ids } }, { targetUser: { $in: ids } }];
+    }
+
     const [logs, total] = await Promise.all([
       AuditLog.find(query).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(Number(limit))
         .populate("admin", "username displayName avatar")
@@ -376,7 +389,20 @@ router.get("/audit-log", adminAuth, async (req, res) => {
         .populate("targetPost", "content"),
       AuditLog.countDocuments(query),
     ]);
-    res.json({ logs, total });
+    res.json({ logs, total, page: Number(page), limit: Number(limit) });
+  } catch (err) {
+    res.status(500).json({ message: "Eroare" });
+  }
+});
+
+// ── Audit log — sumar acțiuni (pentru dashboard / filtre) ───
+router.get("/audit-log/summary", adminAuth, async (req, res) => {
+  try {
+    const summary = await AuditLog.aggregate([
+      { $group: { _id: "$action", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]);
+    res.json(summary);
   } catch (err) {
     res.status(500).json({ message: "Eroare" });
   }

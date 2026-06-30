@@ -187,8 +187,6 @@ router.post("/me/ping", auth, async (req, res) => {
   }
 });
 
-module.exports = router;
-
 // 🏆 Leaderboard — top useri după postări, like-uri primite, urmăritori
 router.get("/leaderboard/all", auth, async (req, res) => {
   try {
@@ -240,10 +238,16 @@ router.get("/leaderboard/all", auth, async (req, res) => {
     const topFollowers = [...enriched].sort((a, b) => b.followerCount - a.followerCount).slice(0, 20);
     const topPosts = [...enriched].sort((a, b) => b.postCount - a.postCount).slice(0, 20);
     const topLikes = [...enriched].sort((a, b) => b.likeCount - a.likeCount).slice(0, 20);
+    const topOverall = [...enriched]
+      .map(u => ({ ...u, score: u.followerCount * 2 + u.postCount * 3 + u.likeCount }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 20);
 
-    res.json({ topFollowers, topPosts, topLikes });
+    res.json({ topFollowers, topPosts, topLikes, topOverall });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Eroare leaderboard" });
   }
 });
+
+module.exports = router;
